@@ -5,55 +5,52 @@ use crate::sponge::{
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::any::TypeId;
+
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 
-/// constraints for Poseidon
-#[cfg(feature = "gr1cs")]
-pub mod constraints;
+/// constraints for Rescue
+pub mod gr1cs_constraints;
+
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-pub(crate) use tests::poseidon_parameters_for_test;
+pub(crate) use tests::rescue_parameters_for_test;
 
-/// default parameters traits for Poseidon
+/// default parameters traits for Rescue
 pub mod traits;
+use num_bigint::BigUint;
 pub use traits::*;
 
 mod grain_lfsr;
 
 /// Config and RNG used
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
-pub struct PoseidonConfig<F: PrimeField> {
-    /// Number of rounds in a full-round operation.
-    pub full_rounds: usize,
-    /// Number of rounds in a partial-round operation.
-    pub partial_rounds: usize,
+pub struct RescueConfig<F: PrimeField> {
+    /// Number of rounds
+    /// specified by parameter `N` in the [paper](https://eprint.iacr.org/2020/1143.pdf)
+    pub rounds: usize,
     /// Exponent used in S-boxes.
     pub alpha: u64,
-    /// Additive Round keys. These are added before each MDS matrix application to make it an affine shift.
+    /// Exponent used in S-boxes.
+    pub alpha_inv: BigUint,
+    /// Additive Round constants.
     /// They are indexed by `ark[round_num][state_element_index]`
-    pub ark: Vec<Vec<F>>,
+    /// specified by parameter `round_constants` in the [paper](https://eprint.iacr.org/2020/1143.pdf) in a flattened array.
+    pub arc: Vec<Vec<F>>,
     /// Maximally Distance Separating (MDS) Matrix.
     pub mds: Vec<Vec<F>>,
     /// The rate (in terms of number of field elements).
-    /// See [On the Indifferentiability of the Sponge Construction](https://iacr.org/archive/eurocrypt2008/49650180/49650180.pdf)
-    /// for more details on the rate and capacity of a sponge.
     pub rate: usize,
     /// The capacity (in terms of number of field elements).
     pub capacity: usize,
 }
 
 #[derive(Clone)]
-/// A duplex sponge based using the Poseidon permutation.
-///
-/// This implementation of Poseidon is entirely from Fractal's implementation in [COS20][cos]
-/// with small syntax changes.
-///
-/// [cos]: https://eprint.iacr.org/2019/1076
-pub struct PoseidonSponge<F: PrimeField> {
+/// A duplex sponge based using the Rescue permutation.
+pub struct RescueSponge<F: PrimeField> {
     /// Sponge Config
-    pub parameters: PoseidonConfig<F>,
+    pub parameters: RescueConfig<F>,
 
     // Sponge State
     /// Current sponge's state (current elements in the permutation block)
@@ -62,26 +59,23 @@ pub struct PoseidonSponge<F: PrimeField> {
     pub mode: DuplexSpongeMode,
 }
 
-impl<F: PrimeField> PoseidonSponge<F> {
-    fn apply_s_box(&self, state: &mut [F], is_full_round: bool) {
-        // Full rounds apply the S Box (x^alpha) to every element of state
-        if is_full_round {
-            for elem in state {
-                *elem = elem.pow(&[self.parameters.alpha]);
-            }
-        }
-        // Partial rounds apply the S Box (x^alpha) to just the first element of state
-        else {
-            state[0] = state[0].pow(&[self.parameters.alpha]);
+impl<F: PrimeField> RescueSponge<F> {
+    /// Apply the S-box to the state. the exponent can be `alpha` or `alpha_inv` depending on the position of the s-box in the permutation.
+    fn apply_s_box(&self, state: &mut [F], exponent: &[u64]) {
+        for elem in state {
+            *elem = elem.pow(exponent);
         }
     }
 
-    fn apply_ark(&self, state: &mut [F], round_number: usize) {
+    /// Apply the additive round constants to the state. Depending on the round number i, the round key is fetched from `RescueConfig.arc[i]`
+    /// TODO: Change this to get the round number instead of the round key
+    fn apply_arc(&self, state: &mut [F], round_key: &Vec<F>) {
         for (i, state_elem) in state.iter_mut().enumerate() {
-            state_elem.add_assign(&self.parameters.ark[round_number][i]);
+            state_elem.add_assign(&round_key[i]);
         }
     }
 
+    /// Multiply the state with the MDS matrix. The MDS matrix is stored in `RescueConfig.mds`
     fn apply_mds(&self, state: &mut [F]) {
         let mut new_state = Vec::new();
         for i in 0..state.len() {
@@ -95,28 +89,22 @@ impl<F: PrimeField> PoseidonSponge<F> {
         state.clone_from_slice(&new_state[..state.len()])
     }
 
+    /// The permutation function of the Rescue Sponge. It corresponds to the Algorithm 3 in the [paper](https://eprint.iacr.org/2020/1143.pdf)
     fn permute(&mut self) {
-        let full_rounds_over_2 = self.parameters.full_rounds / 2;
         let mut state = self.state.clone();
-        for i in 0..full_rounds_over_2 {
-            self.apply_ark(&mut state, i);
-            self.apply_s_box(&mut state, true);
+        assert_eq!(self.parameters.rounds * 2 + 1, self.parameters.arc.len());
+        // TODO: Check this arc[0]
+        self.apply_arc(&mut state, &self.parameters.arc[0]);
+        for (round, round_key) in self.parameters.arc[1..].iter().enumerate() {
+            if (round % 2) == 0 {
+                self.apply_s_box(&mut state, &self.parameters.alpha_inv.to_u64_digits());
+            } else {
+                self.apply_s_box(&mut state, &[self.parameters.alpha]);
+            }
             self.apply_mds(&mut state);
+            self.apply_arc(&mut state, round_key);
         }
 
-        for i in full_rounds_over_2..(full_rounds_over_2 + self.parameters.partial_rounds) {
-            self.apply_ark(&mut state, i);
-            self.apply_s_box(&mut state, false);
-            self.apply_mds(&mut state);
-        }
-
-        for i in (full_rounds_over_2 + self.parameters.partial_rounds)
-            ..(self.parameters.partial_rounds + self.parameters.full_rounds)
-        {
-            self.apply_ark(&mut state, i);
-            self.apply_s_box(&mut state, true);
-            self.apply_mds(&mut state);
-        }
         self.state = state;
     }
 
@@ -133,7 +121,6 @@ impl<F: PrimeField> PoseidonSponge<F> {
                 self.mode = DuplexSpongeMode::Absorbing {
                     next_absorb_index: rate_start_index + remaining_elements.len(),
                 };
-
                 return;
             }
             // otherwise absorb (rate - rate_start_index) elements
@@ -174,31 +161,30 @@ impl<F: PrimeField> PoseidonSponge<F> {
                     ..(self.parameters.capacity + num_elements_squeezed + rate_start_index)],
             );
 
-            // Repeat with updated output slices
-            output_remaining = &mut output_remaining[num_elements_squeezed..];
             // Unless we are done with squeezing in this call, permute.
-            if !output_remaining.is_empty() {
+            if output_remaining.len() != self.parameters.rate {
                 self.permute();
             }
-
+            // Repeat with updated output slices
+            output_remaining = &mut output_remaining[num_elements_squeezed..];
             rate_start_index = 0;
         }
     }
 }
 
-impl<F: PrimeField> PoseidonConfig<F> {
-    /// Initialize the parameter for Poseidon Sponge.
+impl<F: PrimeField> RescueConfig<F> {
+    /// Initialize the parameter for Rescue Sponge.
     pub fn new(
-        full_rounds: usize,
-        partial_rounds: usize,
+        rounds: usize,
         alpha: u64,
+        alpha_inv: BigUint,
         mds: Vec<Vec<F>>,
-        ark: Vec<Vec<F>>,
+        arc: Vec<Vec<F>>,
         rate: usize,
         capacity: usize,
     ) -> Self {
-        assert_eq!(ark.len(), full_rounds + partial_rounds);
-        for item in &ark {
+        assert_eq!(arc.len(), 2 * rounds + 1);
+        for item in &arc {
             assert_eq!(item.len(), rate + capacity);
         }
         assert_eq!(mds.len(), rate + capacity);
@@ -206,22 +192,26 @@ impl<F: PrimeField> PoseidonConfig<F> {
             assert_eq!(item.len(), rate + capacity);
         }
         Self {
-            full_rounds,
-            partial_rounds,
+            rounds,
             alpha,
+            alpha_inv,
             mds,
-            ark,
+            arc,
             rate,
             capacity,
         }
     }
 }
 
-impl<F: PrimeField> CryptographicSponge for PoseidonSponge<F> {
-    type Config = PoseidonConfig<F>;
+impl<F: PrimeField> CryptographicSponge for RescueSponge<F> {
+    type Config = RescueConfig<F>;
 
     fn new(parameters: &Self::Config) -> Self {
+        // The initial state of the sponge is all zeros
         let state = vec![F::zero(); parameters.rate + parameters.capacity];
+
+        // The mode of the sponge is initially set to Absorbing the first element
+        // TODO: index of the field or byte?
         let mode = DuplexSpongeMode::Absorbing {
             next_absorb_index: 0,
         };
@@ -234,11 +224,10 @@ impl<F: PrimeField> CryptographicSponge for PoseidonSponge<F> {
     }
 
     fn absorb(&mut self, input: &impl Absorb) {
-        let elems = input.to_sponge_field_elements_as_vec::<F>();
+        let elems: Vec<F> = input.to_sponge_field_elements_as_vec::<F>();
         if elems.is_empty() {
             return;
         }
-
         match self.mode {
             DuplexSpongeMode::Absorbing { next_absorb_index } => {
                 let mut absorb_index = next_absorb_index;
@@ -246,11 +235,13 @@ impl<F: PrimeField> CryptographicSponge for PoseidonSponge<F> {
                     self.permute();
                     absorb_index = 0;
                 }
+
                 self.absorb_internal(absorb_index, elems.as_slice());
             }
             DuplexSpongeMode::Squeezing {
                 next_squeeze_index: _,
             } => {
+                self.permute();
                 self.absorb_internal(0, elems.as_slice());
             }
         };
@@ -320,7 +311,7 @@ impl<F: PrimeField> CryptographicSponge for PoseidonSponge<F> {
     }
 }
 
-impl<F: PrimeField> FieldBasedCryptographicSponge<F> for PoseidonSponge<F> {
+impl<F: PrimeField> FieldBasedCryptographicSponge<F> for RescueSponge<F> {
     fn squeeze_native_field_elements(&mut self, num_elements: usize) -> Vec<F> {
         let mut squeezed_elems = vec![F::zero(); num_elements];
         match self.mode {
@@ -345,14 +336,14 @@ impl<F: PrimeField> FieldBasedCryptographicSponge<F> for PoseidonSponge<F> {
 }
 
 #[derive(Clone)]
-/// Stores the state of a Poseidon Sponge. Does not store any parameter.
-pub struct PoseidonSpongeState<F: PrimeField> {
+/// Stores the state of a Rescue Sponge. Does not store any parameter.
+pub struct RescueSpongeState<F: PrimeField> {
     state: Vec<F>,
     mode: DuplexSpongeMode,
 }
 
-impl<CF: PrimeField> SpongeExt for PoseidonSponge<CF> {
-    type State = PoseidonSpongeState<CF>;
+impl<CF: PrimeField> SpongeExt for RescueSponge<CF> {
+    type State = RescueSpongeState<CF>;
 
     fn from_state(state: Self::State, params: &Self::Config) -> Self {
         let mut sponge = Self::new(params);
@@ -369,37 +360,37 @@ impl<CF: PrimeField> SpongeExt for PoseidonSponge<CF> {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::sponge::poseidon::PoseidonDefaultConfigField;
-    use crate::sponge::test::Fr;
-    use crate::sponge::{
-        poseidon::PoseidonSponge, CryptographicSponge, FieldBasedCryptographicSponge,
-    };
-    use ark_ff::MontFp;
+// #[cfg(test)]
+// mod test {
+//     use crate::sponge::poseidon::PoseidonDefaultConfigField;
+//     use crate::sponge::test::Fr;
+//     use crate::sponge::{
+//         poseidon::PoseidonSponge, CryptographicSponge, FieldBasedCryptographicSponge,
+//     };
+//     use ark_ff::MontFp;
 
-    #[test]
-    fn test_poseidon_sponge_consistency() {
-        let sponge_param = Fr::get_default_poseidon_parameters(2, false).unwrap();
+//     #[test]
+//     fn test_poseidon_sponge_consistency() {
+//         let sponge_param = Fr::get_default_poseidon_parameters(2, false).unwrap();
 
-        let mut sponge = PoseidonSponge::<Fr>::new(&sponge_param);
-        sponge.absorb(&vec![Fr::from(0u8), Fr::from(1u8), Fr::from(2u8)]);
-        let res = sponge.squeeze_native_field_elements(3);
-        assert_eq!(
-            res[0],
-            MontFp!(
-                "40442793463571304028337753002242186710310163897048962278675457993207843616876"
-            )
-        );
-        assert_eq!(
-            res[1],
-            MontFp!("2664374461699898000291153145224099287711224021716202960480903840045233645301")
-        );
-        assert_eq!(
-            res[2],
-            MontFp!(
-                "50191078828066923662070228256530692951801504043422844038937334196346054068797"
-            )
-        );
-    }
-}
+//         let mut sponge = PoseidonSponge::<Fr>::new(&sponge_param);
+//         sponge.absorb(&vec![Fr::from(0u8), Fr::from(1u8), Fr::from(2u8)]);
+//         let res = sponge.squeeze_native_field_elements(3);
+//         assert_eq!(
+//             res[0],
+//             MontFp!(
+//                 "40442793463571304028337753002242186710310163897048962278675457993207843616876"
+//             )
+//         );
+//         assert_eq!(
+//             res[1],
+//             MontFp!("2664374461699898000291153145224099287711224021716202960480903840045233645301")
+//         );
+//         assert_eq!(
+//             res[2],
+//             MontFp!(
+//                 "50191078828066923662070228256530692951801504043422844038937334196346054068797"
+//             )
+//         );
+//     }
+// }

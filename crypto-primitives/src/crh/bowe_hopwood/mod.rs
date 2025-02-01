@@ -25,7 +25,7 @@ use ark_std::{
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-#[cfg(feature = "r1cs")]
+#[cfg(feature = "gr1cs")]
 pub mod constraints;
 
 pub const CHUNK_SIZE: usize = 3;

@@ -1,29 +1,28 @@
-use crate::{
-    crh::{
-        poseidon::{TwoToOneCRH, CRH},
-        CRHScheme, CRHSchemeGadget as CRHGadgetTrait,
-        TwoToOneCRHSchemeGadget as TwoToOneCRHGadgetTrait,
-    },
-    sponge::{
-        constraints::CryptographicSpongeVar,
-        poseidon::{constraints::PoseidonSpongeVar, PoseidonConfig},
-        Absorb,
-    },
+use crate::crh::rescue::{TwoToOneCRH, CRH};
+use crate::crh::CRHScheme;
+use crate::crh::{
+    constraints::CRHSchemeGadget as CRHGadgetTrait,
+    constraints::TwoToOneCRHSchemeGadget as TwoToOneCRHGadgetTrait,
 };
+use crate::sponge::constraints::CryptographicSpongeVar;
+use crate::sponge::rescue::gr1cs_constraints::RescueSpongeVar;
+use crate::sponge::rescue::RescueConfig;
+
+use crate::sponge::Absorb;
 use ark_ff::PrimeField;
-use ark_r1cs_std::{
-    alloc::{AllocVar, AllocationMode},
-    fields::fp::FpVar,
-    GR1CSVar,
-};
+use ark_r1cs_std::alloc::{AllocVar, AllocationMode};
+use ark_r1cs_std::fields::fp::FpVar;
+use ark_r1cs_std::GR1CSVar;
 use ark_relations::gr1cs::{Namespace, SynthesisError};
+use ark_std::borrow::Borrow;
+use ark_std::marker::PhantomData;
+
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
-use ark_std::{borrow::Borrow, marker::PhantomData};
 
 #[derive(Clone)]
 pub struct CRHParametersVar<F: PrimeField + Absorb> {
-    pub parameters: PoseidonConfig<F>,
+    pub parameters: RescueConfig<F>,
 }
 
 pub struct CRHGadget<F: PrimeField + Absorb> {
@@ -50,9 +49,10 @@ impl<F: PrimeField + Absorb> CRHGadgetTrait<CRH<F>, F> for CRHGadget<F> {
                 CRH::<F>::evaluate(&parameters.parameters, constant_input).unwrap(),
             ))
         } else {
-            let mut sponge = PoseidonSpongeVar::new(cs, &parameters.parameters);
+            let mut sponge = RescueSpongeVar::new(cs, &parameters.parameters);
             sponge.absorb(&input)?;
             let res = sponge.squeeze_field_elements(1)?;
+
             Ok(res[0].clone())
         }
     }
@@ -91,7 +91,7 @@ impl<F: PrimeField + Absorb> TwoToOneCRHGadgetTrait<TwoToOneCRH<F>, F> for TwoTo
                 .unwrap(),
             ))
         } else {
-            let mut sponge = PoseidonSpongeVar::new(cs, &parameters.parameters);
+            let mut sponge = RescueSpongeVar::new(cs, &parameters.parameters);
             sponge.absorb(left_input)?;
             sponge.absorb(right_input)?;
             let res = sponge.squeeze_field_elements(1)?;
@@ -100,8 +100,8 @@ impl<F: PrimeField + Absorb> TwoToOneCRHGadgetTrait<TwoToOneCRH<F>, F> for TwoTo
     }
 }
 
-impl<F: PrimeField + Absorb> AllocVar<PoseidonConfig<F>, F> for CRHParametersVar<F> {
-    fn new_variable<T: Borrow<PoseidonConfig<F>>>(
+impl<F: PrimeField + Absorb> AllocVar<RescueConfig<F>, F> for CRHParametersVar<F> {
+    fn new_variable<T: Borrow<RescueConfig<F>>>(
         _cs: impl Into<Namespace<F>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         _mode: AllocationMode,
@@ -116,19 +116,21 @@ impl<F: PrimeField + Absorb> AllocVar<PoseidonConfig<F>, F> for CRHParametersVar
 
 #[cfg(test)]
 mod test {
-    use crate::crh::poseidon::constraints::{CRHGadget, CRHParametersVar, TwoToOneCRHGadget};
-    use crate::crh::poseidon::{TwoToOneCRH, CRH};
-    use crate::crh::{CRHScheme, CRHSchemeGadget};
-    use crate::crh::{TwoToOneCRHScheme, TwoToOneCRHSchemeGadget};
-    use crate::sponge::poseidon::PoseidonConfig;
-    use ark_bls12_377::Fr;
+    use core::str::FromStr;
+
+    use crate::crh::rescue::gr1cs_constraints::{CRHGadget, CRHParametersVar, TwoToOneCRHGadget};
+    use crate::crh::rescue::{TwoToOneCRH, CRH};
+    use crate::crh::{constraints::CRHSchemeGadget, CRHScheme};
+    use crate::crh::{constraints::TwoToOneCRHSchemeGadget, TwoToOneCRHScheme};
+    use crate::sponge::rescue::RescueConfig;
+    use ark_bls12_381::Fr;
+    use ark_ff::UniformRand;
     use ark_r1cs_std::alloc::AllocVar;
-    use ark_r1cs_std::{
-        fields::fp::{AllocatedFp, FpVar},
-        GR1CSVar,
-    };
+    use ark_r1cs_std::fields::fp::{AllocatedFp, FpVar};
+    use ark_r1cs_std::GR1CSVar;
+    use ark_relations::gr1cs::predicate::PredicateConstraintSystem;
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_std::UniformRand;
+    use num_bigint::BigUint;
 
     #[test]
     fn test_consistency() {
@@ -137,34 +139,44 @@ mod test {
         // The following way of generating the MDS matrix is incorrect
         // and is only for test purposes.
 
-        let mut mds = vec![vec![]; 3];
-        for i in 0..3 {
-            for _ in 0..3 {
+        let mut mds = vec![vec![]; 4];
+        for i in 0..4 {
+            for _ in 0..4 {
                 mds[i].push(Fr::rand(&mut test_rng));
             }
         }
 
-        let mut ark = vec![vec![]; 8 + 24];
-        for i in 0..8 + 24 {
-            for _ in 0..3 {
+        let mut ark = vec![vec![]; 25];
+        for i in 0..25 {
+            for _ in 0..4 {
                 ark[i].push(Fr::rand(&mut test_rng));
             }
         }
 
         let mut test_a = Vec::new();
         let mut test_b = Vec::new();
-        for _ in 0..3 {
+        for _ in 0..9 {
             test_a.push(Fr::rand(&mut test_rng));
             test_b.push(Fr::rand(&mut test_rng));
         }
-
-        let params = PoseidonConfig::<Fr>::new(8, 24, 31, mds, ark, 2, 1);
+        let alpha_inv: BigUint = BigUint::from_str(
+            "20974350070050476191779096203274386335076221000211055129041463479975432473805",
+        )
+        .unwrap();
+        let params = RescueConfig::<Fr>::new(12, 5, alpha_inv, mds, ark, 3, 1);
         let crh_a = CRH::<Fr>::evaluate(&params, test_a.clone()).unwrap();
         let crh_b = CRH::<Fr>::evaluate(&params, test_b.clone()).unwrap();
         let crh = TwoToOneCRH::<Fr>::compress(&params, crh_a, crh_b).unwrap();
 
         let cs = ConstraintSystem::<Fr>::new_ref();
-
+        let pow_pred = PredicateConstraintSystem::new_polynomial_predicate(
+            2,
+            vec![
+                (Fr::from(1u8), vec![(5, 0)]),
+                (Fr::from(-1i8), vec![(0, 1)]),
+            ],
+        );
+        cs.register_predicate("POW", pow_pred).unwrap();
         let mut test_a_g = Vec::new();
         let mut test_b_g = Vec::new();
 
@@ -179,11 +191,10 @@ mod test {
             ));
         }
 
-        let params_g = CRHParametersVar::<Fr>::new_witness(cs, || Ok(params)).unwrap();
+        let params_g = CRHParametersVar::<Fr>::new_witness(cs.clone(), || Ok(params)).unwrap();
         let crh_a_g = CRHGadget::<Fr>::evaluate(&params_g, &test_a_g).unwrap();
         let crh_b_g = CRHGadget::<Fr>::evaluate(&params_g, &test_b_g).unwrap();
         let crh_g = TwoToOneCRHGadget::<Fr>::compress(&params_g, &crh_a_g, &crh_b_g).unwrap();
-
         assert_eq!(crh_a, crh_a_g.value().unwrap());
         assert_eq!(crh_b, crh_b_g.value().unwrap());
         assert_eq!(crh, crh_g.value().unwrap());

@@ -1,27 +1,30 @@
-use crate::sponge::{
-    constraints::{AbsorbGadget, CryptographicSpongeVar, SpongeWithGadget},
-    poseidon::{PoseidonConfig, PoseidonSponge},
-    DuplexSpongeMode,
-};
-use ark_ff::PrimeField;
-use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
+
+use crate::sponge::constraints::AbsorbGadget;
+use crate::sponge::constraints::{CryptographicSpongeVar, SpongeWithGadget};
+use crate::sponge::rescue::{RescueConfig, RescueSponge};
+use crate::sponge::DuplexSpongeMode;
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
+use ark_ff::PrimeField;
+use ark_r1cs_std::fields::fp::FpVar;
+use ark_r1cs_std::prelude::*;
+
+use ark_relations::lc;
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 
 #[derive(Clone)]
-/// the gadget for Poseidon sponge
+/// the gadget for Rescue sponge
 ///
-/// This implementation of Poseidon is entirely from Fractal's implementation in [COS20][cos]
+/// This implementation of Rescue is entirely from Fractal's implementation in [COS20][cos]
 /// with small syntax changes.
 ///
 /// [cos]: https://eprint.iacr.org/2019/1076
-pub struct PoseidonSpongeVar<F: PrimeField> {
+pub struct RescueSpongeVar<F: PrimeField> {
     /// Constraint system
     pub cs: ConstraintSystemRef<F>,
 
     /// Sponge Parameters
-    pub parameters: PoseidonConfig<F>,
+    pub parameters: RescueConfig<F>,
 
     // Sponge State
     /// The sponge's state
@@ -30,40 +33,69 @@ pub struct PoseidonSpongeVar<F: PrimeField> {
     pub mode: DuplexSpongeMode,
 }
 
-impl<F: PrimeField> SpongeWithGadget<F> for PoseidonSponge<F> {
-    type Var = PoseidonSpongeVar<F>;
+impl<F: PrimeField> SpongeWithGadget<F> for RescueSponge<F> {
+    type Var = RescueSpongeVar<F>;
 }
 
-impl<F: PrimeField> PoseidonSpongeVar<F> {
-    #[tracing::instrument(target = "gr1cs", skip(self))]
+impl<F: PrimeField> RescueSpongeVar<F> {
+
+
     fn apply_s_box(
         &self,
         state: &mut [FpVar<F>],
-        is_full_round: bool,
+        exponent: &[u64],
+        alpha: u64,
+        // round: usize
     ) -> Result<(), SynthesisError> {
-        // Full rounds apply the S Box (x^alpha) to every element of state
-        if is_full_round {
+        let cs = state[0].cs();
+
+        if [alpha] == exponent {
+
             for state_item in state.iter_mut() {
-                *state_item = state_item.pow_by_constant(&[self.parameters.alpha])?;
+                let new_state_item = FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent))).unwrap();
+                match (&state_item,&new_state_item) {
+                    (FpVar::Var(alloc_fp),FpVar::Var(new_alloc_fp)) => {
+                        let _ = cs.enforce_constraint("POW",vec![lc!()+ alloc_fp.variable,lc!()+new_alloc_fp.variable], );
+                        *state_item = new_state_item;
+
+                    }
+                    _ => {
+                        // std::dbg!(round);
+                        *state_item = state_item.pow_by_constant(exponent)?;
+                    }
+                }
+            }
+
+        } else {
+            for state_item in state.iter_mut() {
+                let new_state_item = FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent))).unwrap();
+                // std::dbg!(&state_item);
+                // std::dbg!(&new_state_item);
+                match (&state_item,&new_state_item) {
+                    (FpVar::Var(alloc_fp),FpVar::Var(new_alloc_fp)) => {
+                        let _ = cs.enforce_constraint("POW", vec![lc!()+ new_alloc_fp.variable,lc!()+alloc_fp.variable], );
+
+                    },
+                    _ => {
+                        // std::dbg!(round);
+                        *state_item = state_item.pow_by_constant(exponent)?;
+                    }
+                }
+                *state_item = new_state_item;
+
             }
         }
-        // Partial rounds apply the S Box (x^alpha) to just the first element of state
-        else {
-            state[0] = state[0].pow_by_constant(&[self.parameters.alpha])?;
-        }
-
         Ok(())
+
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self))]
-    fn apply_ark(&self, state: &mut [FpVar<F>], round_number: usize) -> Result<(), SynthesisError> {
+    fn apply_ark(&self, state: &mut [FpVar<F>], round_key: &Vec<F>) -> Result<(), SynthesisError> {
         for (i, state_elem) in state.iter_mut().enumerate() {
-            *state_elem += self.parameters.ark[round_number][i];
+            *state_elem += round_key[i];
         }
         Ok(())
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn apply_mds(&self, state: &mut [FpVar<F>]) -> Result<(), SynthesisError> {
         let mut new_state = Vec::new();
         let zero = FpVar::<F>::zero();
@@ -79,34 +111,23 @@ impl<F: PrimeField> PoseidonSpongeVar<F> {
         Ok(())
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn permute(&mut self) -> Result<(), SynthesisError> {
-        let full_rounds_over_2 = self.parameters.full_rounds / 2;
         let mut state = self.state.clone();
-        for i in 0..full_rounds_over_2 {
-            self.apply_ark(&mut state, i)?;
-            self.apply_s_box(&mut state, true)?;
-            self.apply_mds(&mut state)?;
+        let alpha_inv: Vec<u64> = self.parameters.alpha_inv.to_u64_digits();
+        let _ = self.apply_ark(&mut state, &self.parameters.arc[0]);
+        for (round, round_key) in self.parameters.arc[1..].iter().enumerate() {
+            if (round % 2) == 0 {
+                self.apply_s_box(&mut state, &alpha_inv, self.parameters.alpha)?;
+            } else {
+                self.apply_s_box(&mut state, &[self.parameters.alpha], self.parameters.alpha)?;
+            }
+            let _ = self.apply_mds(&mut state);
+            let _ = self.apply_ark(&mut state, round_key);
         }
-        for i in full_rounds_over_2..(full_rounds_over_2 + self.parameters.partial_rounds) {
-            self.apply_ark(&mut state, i)?;
-            self.apply_s_box(&mut state, false)?;
-            self.apply_mds(&mut state)?;
-        }
-
-        for i in (full_rounds_over_2 + self.parameters.partial_rounds)
-            ..(self.parameters.partial_rounds + self.parameters.full_rounds)
-        {
-            self.apply_ark(&mut state, i)?;
-            self.apply_s_box(&mut state, true)?;
-            self.apply_mds(&mut state)?;
-        }
-
         self.state = state;
         Ok(())
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn absorb_internal(
         &mut self,
         mut rate_start_index: usize,
@@ -142,7 +163,6 @@ impl<F: PrimeField> PoseidonSpongeVar<F> {
     }
 
     // Squeeze |output| many elements. This does not end in a squeeze
-    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn squeeze_internal(
         &mut self,
         mut rate_start_index: usize,
@@ -168,23 +188,21 @@ impl<F: PrimeField> PoseidonSpongeVar<F> {
                     ..(self.parameters.capacity + num_elements_squeezed + rate_start_index)],
             );
 
-            // Repeat with updated output slices and rate start index
-            remaining_output = &mut remaining_output[num_elements_squeezed..];
-
             // Unless we are done with squeezing in this call, permute.
-            if !remaining_output.is_empty() {
+            if remaining_output.len() != self.parameters.rate {
                 self.permute()?;
             }
+            // Repeat with updated output slices and rate start index
+            remaining_output = &mut remaining_output[num_elements_squeezed..];
             rate_start_index = 0;
         }
     }
 }
 
-impl<F: PrimeField> CryptographicSpongeVar<F, PoseidonSponge<F>> for PoseidonSpongeVar<F> {
-    type Parameters = PoseidonConfig<F>;
+impl<F: PrimeField> CryptographicSpongeVar<F, RescueSponge<F>> for RescueSpongeVar<F> {
+    type Parameters = RescueConfig<F>;
 
-    #[tracing::instrument(target = "gr1cs", skip(cs))]
-    fn new(cs: ConstraintSystemRef<F>, parameters: &PoseidonConfig<F>) -> Self {
+    fn new(cs: ConstraintSystemRef<F>, parameters: &RescueConfig<F>) -> Self {
         let zero = FpVar::<F>::zero();
         let state = vec![zero; parameters.rate + parameters.capacity];
         let mode = DuplexSpongeMode::Absorbing {
@@ -199,12 +217,10 @@ impl<F: PrimeField> CryptographicSpongeVar<F, PoseidonSponge<F>> for PoseidonSpo
         }
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn cs(&self) -> ConstraintSystemRef<F> {
         self.cs.clone()
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self, input))]
     fn absorb(&mut self, input: &impl AbsorbGadget<F>) -> Result<(), SynthesisError> {
         let input = input.to_sponge_field_elements()?;
         if input.is_empty() {
@@ -223,6 +239,7 @@ impl<F: PrimeField> CryptographicSpongeVar<F, PoseidonSponge<F>> for PoseidonSpo
             DuplexSpongeMode::Squeezing {
                 next_squeeze_index: _,
             } => {
+                self.permute()?;
                 self.absorb_internal(0, input.as_slice())?;
             }
         };
@@ -230,7 +247,6 @@ impl<F: PrimeField> CryptographicSpongeVar<F, PoseidonSponge<F>> for PoseidonSpo
         Ok(())
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn squeeze_bytes(&mut self, num_bytes: usize) -> Result<Vec<UInt8<F>>, SynthesisError> {
         let usable_bytes = ((F::MODULUS_BIT_SIZE - 1) / 8) as usize;
 
@@ -246,7 +262,6 @@ impl<F: PrimeField> CryptographicSpongeVar<F, PoseidonSponge<F>> for PoseidonSpo
         Ok(bytes)
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn squeeze_bits(&mut self, num_bits: usize) -> Result<Vec<Boolean<F>>, SynthesisError> {
         let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
 
@@ -262,7 +277,6 @@ impl<F: PrimeField> CryptographicSpongeVar<F, PoseidonSponge<F>> for PoseidonSpo
         Ok(bits)
     }
 
-    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn squeeze_field_elements(
         &mut self,
         num_elements: usize,
@@ -293,16 +307,19 @@ impl<F: PrimeField> CryptographicSpongeVar<F, PoseidonSponge<F>> for PoseidonSpo
 #[cfg(test)]
 mod tests {
     use crate::sponge::constraints::CryptographicSpongeVar;
-    use crate::sponge::poseidon::constraints::PoseidonSpongeVar;
-    use crate::sponge::poseidon::tests::poseidon_parameters_for_test;
-    use crate::sponge::poseidon::PoseidonSponge;
+    use crate::sponge::rescue::gr1cs_constraints::RescueSpongeVar;
+    use crate::sponge::rescue::rescue_parameters_for_test;
+    use crate::sponge::rescue::RescueSponge;
     use crate::sponge::test::Fr;
     use crate::sponge::{CryptographicSponge, FieldBasedCryptographicSponge, FieldElementSize};
-    use ark_ff::{Field, PrimeField, UniformRand};
+    use ark_r1cs_std::alloc::AllocVar;
     use ark_r1cs_std::fields::fp::FpVar;
-    use ark_r1cs_std::prelude::*;
+    use ark_r1cs_std::uint8::UInt8;
+    use ark_r1cs_std::GR1CSVar;
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_relations::*;
+    use ark_ff::{Field, PrimeField, UniformRand};
+
+    use ark_relations::ns;
     use ark_std::test_rng;
 
     #[test]
@@ -322,10 +339,10 @@ mod tests {
             .map(|v| UInt8::new_input_vec(ns!(cs, "absorb2"), v).unwrap())
             .collect();
 
-        let sponge_params = poseidon_parameters_for_test();
+        let sponge_params = rescue_parameters_for_test();
 
-        let mut native_sponge = PoseidonSponge::<Fr>::new(&sponge_params);
-        let mut constraint_sponge = PoseidonSpongeVar::<Fr>::new(cs.clone(), &sponge_params);
+        let mut native_sponge = RescueSponge::<Fr>::new(&sponge_params);
+        let mut constraint_sponge = RescueSpongeVar::<Fr>::new(cs.clone(), &sponge_params);
 
         native_sponge.absorb(&absorb1);
         constraint_sponge.absorb(&absorb1_var).unwrap();
@@ -351,8 +368,8 @@ mod tests {
         let squeeze_bits = Fr::MODULUS_BIT_SIZE / 2;
         let max_squeeze = Fr::from(2).pow(<Fr as PrimeField>::BigInt::from(squeeze_bits));
 
-        let sponge_params = poseidon_parameters_for_test();
-        let mut native_sponge = PoseidonSponge::<Fr>::new(&sponge_params);
+        let sponge_params = rescue_parameters_for_test();
+        let mut native_sponge = RescueSponge::<Fr>::new(&sponge_params);
 
         let squeeze =
             native_sponge.squeeze_field_elements_with_sizes::<Fr>(&[FieldElementSize::Truncated(
@@ -361,7 +378,7 @@ mod tests {
         assert!(squeeze < max_squeeze);
 
         let cs = ConstraintSystem::new_ref();
-        let mut constraint_sponge = PoseidonSpongeVar::<Fr>::new(cs.clone(), &sponge_params);
+        let mut constraint_sponge = RescueSpongeVar::<Fr>::new(cs.clone(), &sponge_params);
 
         let (squeeze, bits) = constraint_sponge
             .squeeze_emulated_field_elements_with_sizes::<Fr>(&[FieldElementSize::Truncated(

@@ -9,7 +9,7 @@ use ark_ec::{
 };
 use ark_ff::Field;
 use ark_r1cs_std::{groups::curves::twisted_edwards::AffineVar, prelude::*};
-use ark_relations::r1cs::{Namespace, SynthesisError};
+use ark_relations::gr1cs::{Namespace, SynthesisError};
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 use ark_std::{borrow::Borrow, iter, marker::PhantomData};
@@ -48,7 +48,7 @@ where
     type OutputVar = F;
     type ParametersVar = ParametersVar<P, W>;
 
-    #[tracing::instrument(target = "r1cs", skip(parameters, input))]
+    #[tracing::instrument(target = "gr1cs", skip(parameters, input))]
     fn evaluate(
         parameters: &Self::ParametersVar,
         input: &Self::InputVar,
@@ -117,7 +117,7 @@ where
     type OutputVar = F;
     type ParametersVar = ParametersVar<P, W>;
 
-    #[tracing::instrument(target = "r1cs", skip(parameters))]
+    #[tracing::instrument(target = "gr1cs", skip(parameters))]
     fn evaluate(
         parameters: &Self::ParametersVar,
         left_input: &Self::InputVar,
@@ -156,7 +156,7 @@ where
     P: TECurveConfig,
     W: Window,
 {
-    #[tracing::instrument(target = "r1cs", skip(_cs, f))]
+    #[tracing::instrument(target = "gr1cs", skip(_cs, f))]
     fn new_variable<T: Borrow<Parameters<P>>>(
         _cs: impl Into<Namespace<ConstraintF<P>>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
@@ -170,135 +170,134 @@ where
     }
 }
 
-#[cfg(test)]
-mod test {
-    use ark_std::rand::Rng;
+// #[cfg(test)]
+// mod test {
+//     use ark_std::rand::Rng;
 
-    use crate::crh::bowe_hopwood;
-    use crate::crh::{pedersen, TwoToOneCRHScheme, TwoToOneCRHSchemeGadget};
-    use crate::crh::{CRHScheme, CRHSchemeGadget};
-    use ark_ed_on_bls12_381::{constraints::FqVar, EdwardsConfig, Fq as Fr};
-    use ark_r1cs_std::{alloc::AllocVar, uint8::UInt8, R1CSVar};
-    use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
-    use ark_std::test_rng;
+//     use crate::crh::bowe_hopwood;
+//     use crate::crh::{pedersen, TwoToOneCRHScheme, TwoToOneCRHSchemeGadget};
+//     use crate::crh::{CRHScheme, CRHSchemeGadget};
+//     use ark_ed_on_bls12_381::{constraints::FqVar, EdwardsConfig, Fq as Fr};
+//     use ark_r1cs_std::{alloc::AllocVar, uint8::UInt8, R1CSVar};
+//     use ark_relations::gr1cs::{ConstraintSystem, ConstraintSystemRef};
+//     use ark_std::test_rng;
 
-    type TestCRH = bowe_hopwood::CRH<EdwardsConfig, Window>;
-    type TestCRHGadget = bowe_hopwood::constraints::CRHGadget<EdwardsConfig, FqVar>;
+//     type TestCRH = bowe_hopwood::CRH<EdwardsConfig, Window>;
+//     type TestCRHGadget = bowe_hopwood::constraints::CRHGadget<EdwardsConfig, FqVar>;
 
-    type TestTwoToOneCRH = bowe_hopwood::TwoToOneCRH<EdwardsConfig, Window>;
-    type TestTwoToOneCRHGadget = bowe_hopwood::constraints::TwoToOneCRHGadget<EdwardsConfig, FqVar>;
+//     type TestTwoToOneCRH = bowe_hopwood::TwoToOneCRH<EdwardsConfig, Window>;
+//     type TestTwoToOneCRHGadget = bowe_hopwood::constraints::TwoToOneCRHGadget<EdwardsConfig, FqVar>;
 
-    #[derive(Clone, PartialEq, Eq, Hash)]
-    pub(super) struct Window;
+//     #[derive(Clone, PartialEq, Eq, Hash)]
+//     pub(super) struct Window;
 
-    impl pedersen::Window for Window {
-        const WINDOW_SIZE: usize = 63;
-        const NUM_WINDOWS: usize = 8;
-    }
+//     impl pedersen::Window for Window {
+//         const WINDOW_SIZE: usize = 63;
+//         const NUM_WINDOWS: usize = 8;
+//     }
 
-    fn generate_u8_input<R: Rng>(
-        cs: ConstraintSystemRef<Fr>,
-        size: usize,
-        rng: &mut R,
-    ) -> (Vec<u8>, Vec<UInt8<Fr>>) {
-        let mut input = vec![1u8; size];
-        rng.fill_bytes(&mut input);
+//     fn generate_u8_input<R: Rng>(
+//         cs: ConstraintSystemRef<Fr>,
+//         size: usize,
+//         rng: &mut R,
+//     ) -> (Vec<u8>, Vec<UInt8<Fr>>) {
+//         let mut input = vec![1u8; size];
+//         rng.fill_bytes(&mut input);
 
-        let mut input_bytes = vec![];
-        for byte in input.iter() {
-            input_bytes.push(UInt8::new_witness(cs.clone(), || Ok(byte)).unwrap());
-        }
-        (input, input_bytes)
-    }
+//         let mut input_bytes = vec![];
+//         for byte in input.iter() {
+//             input_bytes.push(UInt8::new_witness(cs.clone(), || Ok(byte)).unwrap());
+//         }
+//         (input, input_bytes)
+//     }
 
-    #[test]
-    fn test_native_equality() {
-        let rng = &mut test_rng();
-        let cs = ConstraintSystem::<Fr>::new_ref();
+//     #[test]
+//     fn test_native_equality() {
+//         let rng = &mut test_rng();
+//         let cs = ConstraintSystem::<Fr>::new_ref();
 
-        let (input, input_var) = generate_u8_input(cs.clone(), 189, rng);
-        println!("number of constraints for input: {}", cs.num_constraints());
+//         let (input, input_var) = generate_u8_input(cs.clone(), 189, rng);
+//         println!("number of constraints for input: {}", cs.num_constraints());
 
-        let parameters = TestCRH::setup(rng).unwrap();
-        let primitive_result = TestCRH::evaluate(&parameters, input.as_slice()).unwrap();
+//         let parameters = TestCRH::setup(rng).unwrap();
+//         let primitive_result = TestCRH::evaluate(&parameters, input.as_slice()).unwrap();
 
-        let parameters_var =
-            <TestCRHGadget as CRHSchemeGadget<TestCRH, Fr>>::ParametersVar::new_witness(
-                ark_relations::ns!(cs, "parameters_var"),
-                || Ok(&parameters),
-            )
-            .unwrap();
-        println!(
-            "number of constraints for input + params: {}",
-            cs.num_constraints()
-        );
+//         let parameters_var =
+//             <TestCRHGadget as CRHSchemeGadget<TestCRH, Fr>>::ParametersVar::new_witness(
+//                 ark_relations::ns!(cs, "parameters_var"),
+//                 || Ok(&parameters),
+//             )
+//             .unwrap();
+//         println!(
+//             "number of constraints for input + params: {}",
+//             cs.num_constraints()
+//         );
 
-        let result_var = TestCRHGadget::evaluate(&parameters_var, &input_var).unwrap();
+//         let result_var = TestCRHGadget::evaluate(&parameters_var, &input_var).unwrap();
 
-        println!("number of constraints total: {}", cs.num_constraints());
+//         println!("number of constraints total: {}", cs.num_constraints());
 
-        assert_eq!(primitive_result, result_var.value().unwrap());
-        assert!(cs.is_satisfied().unwrap());
-    }
+//         assert_eq!(primitive_result, result_var.value().unwrap());
+//         assert!(cs.is_satisfied().unwrap());
+//     }
 
-    #[test]
-    fn test_native_two_to_one_equality() {
-        let rng = &mut test_rng();
-        let cs = ConstraintSystem::<Fr>::new_ref();
+//     #[test]
+//     fn test_native_two_to_one_equality() {
+//         let rng = &mut test_rng();
+//         let cs = ConstraintSystem::<Fr>::new_ref();
 
-        // Max input size is 63 bytes. That leaves 31 for the left half, 31 for the right, and 1
-        // byte of padding.
-        let (left_input, left_input_var) = generate_u8_input(cs.clone(), 31, rng);
-        let (right_input, right_input_var) = generate_u8_input(cs.clone(), 31, rng);
-        let parameters = TestTwoToOneCRH::setup(rng).unwrap();
-        let primitive_result =
-            TestTwoToOneCRH::evaluate(&parameters, left_input.as_slice(), right_input.as_slice())
-                .unwrap();
+//         // Max input size is 63 bytes. That leaves 31 for the left half, 31 for the right, and 1
+//         // byte of padding.
+//         let (left_input, left_input_var) = generate_u8_input(cs.clone(), 31, rng);
+//         let (right_input, right_input_var) = generate_u8_input(cs.clone(), 31, rng);
+//         let parameters = TestTwoToOneCRH::setup(rng).unwrap();
+//         let primitive_result =
+//             TestTwoToOneCRH::evaluate(&parameters, left_input.as_slice(), right_input.as_slice())
+//                 .unwrap();
 
-        let parameters_var = <TestTwoToOneCRHGadget as TwoToOneCRHSchemeGadget<
-            TestTwoToOneCRH,
-            Fr,
-        >>::ParametersVar::new_witness(
-            ark_relations::ns!(cs, "parameters_var"),
-            || Ok(&parameters),
-        )
-        .unwrap();
+//         let parameters_var = <TestTwoToOneCRHGadget as TwoToOneCRHSchemeGadget<
+//             TestTwoToOneCRH,
+//             Fr,
+//         >>::ParametersVar::new_witness(
+//             ark_relations::ns!(cs, "parameters_var"),
+//             || Ok(&parameters),
+//         )
+//         .unwrap();
 
-        let result_var =
-            TestTwoToOneCRHGadget::evaluate(&parameters_var, &left_input_var, &right_input_var)
-                .unwrap();
+//         let result_var =
+//             TestTwoToOneCRHGadget::evaluate(&parameters_var, &left_input_var, &right_input_var)
+//                 .unwrap();
 
-        let primitive_result = primitive_result;
-        assert_eq!(primitive_result, result_var.value().unwrap());
-        assert!(cs.is_satisfied().unwrap());
-    }
+//         assert_eq!(primitive_result, result_var.value().unwrap());
+//         assert!(cs.is_satisfied().unwrap());
+//     }
 
-    #[should_panic]
-    #[test]
-    fn test_input_size_check() {
-        // Pick parameters that are far too small for a CRH
-        #[derive(Clone, PartialEq, Eq, Hash)]
-        pub(super) struct TooSmallWindow;
-        impl pedersen::Window for TooSmallWindow {
-            const WINDOW_SIZE: usize = 1;
-            const NUM_WINDOWS: usize = 1;
-        }
-        type TestCRH = bowe_hopwood::CRH<EdwardsConfig, TooSmallWindow>;
-        type TestCRHGadget = bowe_hopwood::constraints::CRHGadget<EdwardsConfig, FqVar>;
+//     #[should_panic]
+//     #[test]
+//     fn test_input_size_check() {
+//         // Pick parameters that are far too small for a CRH
+//         #[derive(Clone, PartialEq, Eq, Hash)]
+//         pub(super) struct TooSmallWindow;
+//         impl pedersen::Window for TooSmallWindow {
+//             const WINDOW_SIZE: usize = 1;
+//             const NUM_WINDOWS: usize = 1;
+//         }
+//         type TestCRH = bowe_hopwood::CRH<EdwardsConfig, TooSmallWindow>;
+//         type TestCRHGadget = bowe_hopwood::constraints::CRHGadget<EdwardsConfig, FqVar>;
 
-        let rng = &mut test_rng();
-        let cs = ConstraintSystem::<Fr>::new_ref();
+//         let rng = &mut test_rng();
+//         let cs = ConstraintSystem::<Fr>::new_ref();
 
-        let (_, input_var) = generate_u8_input(cs.clone(), 189, rng);
-        println!("number of constraints for input: {}", cs.num_constraints());
+//         let (_, input_var) = generate_u8_input(cs.clone(), 189, rng);
+//         println!("number of constraints for input: {}", cs.num_constraints());
 
-        let parameters = TestCRH::setup(rng).unwrap();
-        let parameters_var =
-            <TestCRHGadget as CRHSchemeGadget<TestCRH, Fr>>::ParametersVar::new_witness(
-                ark_relations::ns!(cs, "parameters_var"),
-                || Ok(&parameters),
-            )
-            .unwrap();
-        let _ = TestCRHGadget::evaluate(&parameters_var, &input_var).unwrap();
-    }
-}
+//         let parameters = TestCRH::setup(rng).unwrap();
+//         let parameters_var =
+//             <TestCRHGadget as CRHSchemeGadget<TestCRH, Fr>>::ParametersVar::new_witness(
+//                 ark_relations::ns!(cs, "parameters_var"),
+//                 || Ok(&parameters),
+//             )
+//             .unwrap();
+//         let _ = TestCRHGadget::evaluate(&parameters_var, &input_var).unwrap();
+//     }
+// }

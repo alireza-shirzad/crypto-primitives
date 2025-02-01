@@ -11,7 +11,7 @@ use ark_r1cs_std::{
 };
 use ark_relations::{
     lc, ns,
-    r1cs::{
+    gr1cs::{
         ConstraintSynthesizer, ConstraintSystemRef, LinearCombination, Namespace, OptimizationGoal,
         SynthesisError,
     },
@@ -52,7 +52,7 @@ pub trait SNARKGadget<F: PrimeField, ConstraintF: PrimeField, S: SNARK<F>> {
     ///
     /// The default implementation does not omit such checks, and just invokes
     /// `Self::ProofVar::new_variable`.
-    #[tracing::instrument(target = "r1cs", skip(cs, f))]
+    #[tracing::instrument(target = "gr1cs", skip(cs, f))]
     fn new_proof_unchecked<T: Borrow<S::Proof>>(
         cs: impl Into<Namespace<ConstraintF>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
@@ -70,7 +70,7 @@ pub trait SNARKGadget<F: PrimeField, ConstraintF: PrimeField, S: SNARK<F>> {
     ///
     /// The default implementation does not omit such checks, and just invokes
     /// `Self::VerifyingKeyVar::new_variable`.
-    #[tracing::instrument(target = "r1cs", skip(cs, f))]
+    #[tracing::instrument(target = "gr1cs", skip(cs, f))]
     fn new_verification_key_unchecked<T: Borrow<S::VerifyingKey>>(
         cs: impl Into<Namespace<ConstraintF>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
@@ -632,7 +632,7 @@ where
 
                     let limb = AllocatedFp::<CF>::new_witness(ns!(cs, "limb"), || Ok(limb_value))?;
                     lc = lc - limb.variable;
-                    cs.enforce_constraint(lc!(), lc!(), lc).unwrap();
+                    cs.enforce_r1cs_constraint(lc!(), lc!(), lc).unwrap();
 
                     limbs.push(FpVar::from(limb));
                 }

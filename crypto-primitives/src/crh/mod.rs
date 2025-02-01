@@ -4,13 +4,14 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{borrow::Borrow, fmt::Debug, hash::Hash, rand::Rng};
 
 pub mod bowe_hopwood;
-#[cfg(feature = "r1cs")]
+#[cfg(feature = "gr1cs")]
 pub mod constraints;
 pub mod injective_map;
 pub mod pedersen;
 pub mod poseidon;
+pub mod rescue;
 pub mod sha256;
-#[cfg(feature = "r1cs")]
+#[cfg(feature = "gr1cs")]
 pub use constraints::*;
 
 /// Interface to CRH. Note that in this release, while all implementations of `CRH` have fixed length,
