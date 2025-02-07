@@ -15,7 +15,6 @@ pub mod constraints;
 
 use num_bigint::BigUint;
 
-
 /// Config and RNG used
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct RescueConfig<F: PrimeField> {

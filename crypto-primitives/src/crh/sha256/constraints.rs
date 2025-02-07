@@ -385,7 +385,7 @@ mod test {
     use crate::crh::{sha256::digest::Digest, CRHScheme, TwoToOneCRHScheme};
 
     use ark_bls12_377::Fr;
-    use ark_relations::{ns, gr1cs::ConstraintSystem};
+    use ark_relations::{gr1cs::ConstraintSystem, ns};
     use ark_std::rand::RngCore;
 
     const TEST_LENGTHS: &[usize] = &[

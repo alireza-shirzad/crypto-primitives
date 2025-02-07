@@ -1,12 +1,11 @@
-
 use crate::sponge::constraints::AbsorbGadget;
 use crate::sponge::constraints::{CryptographicSpongeVar, SpongeWithGadget};
 use crate::sponge::rescue::{RescueConfig, RescueSponge};
 use crate::sponge::DuplexSpongeMode;
-use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 use ark_ff::PrimeField;
 use ark_r1cs_std::fields::fp::FpVar;
 use ark_r1cs_std::prelude::*;
+use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
@@ -37,7 +36,6 @@ impl<F: PrimeField> SpongeWithGadget<F> for RescueSponge<F> {
 }
 
 impl<F: PrimeField> RescueSpongeVar<F> {
-
     #[cfg(feature = "gr1cs")]
     fn apply_s_box(
         &self,
@@ -48,43 +46,46 @@ impl<F: PrimeField> RescueSpongeVar<F> {
     ) -> Result<(), SynthesisError> {
         use ark_relations::lc;
         let cs = state[0].cs();
-        
+
         if [alpha] == exponent {
-
             for state_item in state.iter_mut() {
-                let new_state_item = FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent))).unwrap();
-                match (&state_item,&new_state_item) {
-                    (FpVar::Var(alloc_fp),FpVar::Var(new_alloc_fp)) => {
-                        let _ = cs.enforce_constraint("XXX",vec![lc!()+ alloc_fp.variable,lc!()+new_alloc_fp.variable], );
+                let new_state_item =
+                    FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent)))
+                        .unwrap();
+                match (&state_item, &new_state_item) {
+                    (FpVar::Var(alloc_fp), FpVar::Var(new_alloc_fp)) => {
+                        let _ = cs.enforce_constraint(
+                            "XXX",
+                            vec![lc!() + alloc_fp.variable, lc!() + new_alloc_fp.variable],
+                        );
                         *state_item = new_state_item;
-
                     }
                     _ => {
                         *state_item = state_item.pow_by_constant(exponent)?;
                     }
                 }
             }
-
         } else {
             for state_item in state.iter_mut() {
-                let new_state_item = FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent))).unwrap();
-                match (&state_item,&new_state_item) {
-                    (FpVar::Var(alloc_fp),FpVar::Var(new_alloc_fp)) => {
-                        let _ = cs.enforce_constraint("XXX", vec![lc!()+ new_alloc_fp.variable,lc!()+alloc_fp.variable], );
-
-                    },
+                let new_state_item =
+                    FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent)))
+                        .unwrap();
+                match (&state_item, &new_state_item) {
+                    (FpVar::Var(alloc_fp), FpVar::Var(new_alloc_fp)) => {
+                        let _ = cs.enforce_constraint(
+                            "XXX",
+                            vec![lc!() + new_alloc_fp.variable, lc!() + alloc_fp.variable],
+                        );
+                    }
                     _ => {
                         *state_item = state_item.pow_by_constant(exponent)?;
                     }
                 }
                 *state_item = new_state_item;
-
             }
         }
         Ok(())
-
     }
-
 
     #[cfg(feature = "r1cs")]
     fn apply_s_box(
@@ -94,21 +95,21 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         alpha: u64,
         // round: usize
     ) -> Result<(), SynthesisError> {
-
         if [alpha] == exponent {
             for state_item in state.iter_mut() {
                 *state_item = state_item.pow_by_constant(exponent)?;
             }
         } else {
             for state_item in state.iter_mut() {
-                let output = FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent))).unwrap();
-                let expected_input = output.pow_by_constant([alpha]).unwrap(); 
+                let output =
+                    FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent)))
+                        .unwrap();
+                let expected_input = output.pow_by_constant([alpha]).unwrap();
                 expected_input.enforce_equal(state_item)?;
                 *state_item = output;
             }
         }
         Ok(())
-
     }
 
     fn apply_ark(&self, state: &mut [FpVar<F>], round_key: &Vec<F>) -> Result<(), SynthesisError> {

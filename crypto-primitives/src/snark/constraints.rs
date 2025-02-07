@@ -10,11 +10,11 @@ use ark_r1cs_std::{
     prelude::*,
 };
 use ark_relations::{
-    lc, ns,
     gr1cs::{
         ConstraintSynthesizer, ConstraintSystemRef, LinearCombination, Namespace, OptimizationGoal,
         SynthesisError,
     },
+    lc, ns,
 };
 use ark_snark::{CircuitSpecificSetupSNARK, UniversalSetupSNARK, SNARK};
 #[cfg(not(feature = "std"))]

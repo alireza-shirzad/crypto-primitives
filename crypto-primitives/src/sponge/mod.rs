@@ -9,9 +9,8 @@ pub mod constraints;
 mod absorb;
 pub use absorb::*;
 
-
-/// The sponge for [Rescue][sad] 
-/// 
+/// The sponge for [Rescue][sad]
+///
 /// [sad]: https://eprint.iacr.org/2020/1143.pdf
 pub mod rescue;
 

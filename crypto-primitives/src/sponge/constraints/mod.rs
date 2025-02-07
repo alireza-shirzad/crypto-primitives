@@ -14,8 +14,8 @@ use ark_r1cs_std::{
     GR1CSVar,
 };
 use ark_relations::{
-    lc,
     gr1cs::{ConstraintSystemRef, LinearCombination, SynthesisError},
+    lc,
 };
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
@@ -78,7 +78,8 @@ pub fn bits_le_to_emulated<'a, F: PrimeField, CF: PrimeField>(
             let gadget =
                 AllocatedFp::new_witness(ark_relations::ns!(cs, "alloc"), || Ok(val[k])).unwrap();
             lc[k] = lc[k].clone() - (CF::one(), gadget.variable);
-            cs.enforce_r1cs_constraint(lc!(), lc!(), lc[k].clone()).unwrap();
+            cs.enforce_r1cs_constraint(lc!(), lc!(), lc[k].clone())
+                .unwrap();
             limbs.push(FpVar::<CF>::from(gadget));
         }
 

@@ -9,13 +9,11 @@ use crate::{
 use ark_ff::PrimeField;
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::Rng};
 
-
 #[cfg(any(feature = "gr1cs", feature = "r1cs"))]
 pub mod constraints;
 
-
 /// The Rescue collision-resistant hash function introduced in [SAD20][sad]
-/// 
+///
 /// [sad]: https://eprint.iacr.org/2020/1143.pdf
 pub struct CRH<F: PrimeField + Absorb> {
     field_phantom: PhantomData<F>,
@@ -50,9 +48,8 @@ impl<F: PrimeField + Absorb> CRHScheme for CRH<F> {
     }
 }
 
-
 /// The 2-to-1 version of the Rescue collision-resistant hash function introduced in [SAD20][sad] used in Merkle trees.
-/// 
+///
 /// [sad]: https://eprint.iacr.org/2020/1143.pdf
 pub struct TwoToOneCRH<F: PrimeField + Absorb> {
     field_phantom: PhantomData<F>,
