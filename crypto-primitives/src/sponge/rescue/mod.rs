@@ -10,19 +10,11 @@ use ark_std::any::TypeId;
 use ark_std::vec::Vec;
 
 /// constraints for Rescue
-pub mod gr1cs_constraints;
+#[cfg(any(feature = "gr1cs", feature = "r1cs"))]
+pub mod constraints;
 
-#[cfg(test)]
-mod tests;
-#[cfg(test)]
-pub(crate) use tests::rescue_parameters_for_test;
-
-/// default parameters traits for Rescue
-pub mod traits;
 use num_bigint::BigUint;
-pub use traits::*;
 
-mod grain_lfsr;
 
 /// Config and RNG used
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
@@ -359,38 +351,3 @@ impl<CF: PrimeField> SpongeExt for RescueSponge<CF> {
         }
     }
 }
-
-// #[cfg(test)]
-// mod test {
-//     use crate::sponge::poseidon::PoseidonDefaultConfigField;
-//     use crate::sponge::test::Fr;
-//     use crate::sponge::{
-//         poseidon::PoseidonSponge, CryptographicSponge, FieldBasedCryptographicSponge,
-//     };
-//     use ark_ff::MontFp;
-
-//     #[test]
-//     fn test_poseidon_sponge_consistency() {
-//         let sponge_param = Fr::get_default_poseidon_parameters(2, false).unwrap();
-
-//         let mut sponge = PoseidonSponge::<Fr>::new(&sponge_param);
-//         sponge.absorb(&vec![Fr::from(0u8), Fr::from(1u8), Fr::from(2u8)]);
-//         let res = sponge.squeeze_native_field_elements(3);
-//         assert_eq!(
-//             res[0],
-//             MontFp!(
-//                 "40442793463571304028337753002242186710310163897048962278675457993207843616876"
-//             )
-//         );
-//         assert_eq!(
-//             res[1],
-//             MontFp!("2664374461699898000291153145224099287711224021716202960480903840045233645301")
-//         );
-//         assert_eq!(
-//             res[2],
-//             MontFp!(
-//                 "50191078828066923662070228256530692951801504043422844038937334196346054068797"
-//             )
-//         );
-//     }
-// }

@@ -3,7 +3,7 @@ use ark_ff::PrimeField;
 use ark_std::vec::Vec;
 
 /// Infrastructure for the constraints counterparts.
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 
 mod absorb;

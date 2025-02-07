@@ -5,7 +5,7 @@ use crate::crh::{
     constraints::TwoToOneCRHSchemeGadget as TwoToOneCRHGadgetTrait,
 };
 use crate::sponge::constraints::CryptographicSpongeVar;
-use crate::sponge::rescue::gr1cs_constraints::RescueSpongeVar;
+use crate::sponge::rescue::constraints::RescueSpongeVar;
 use crate::sponge::rescue::RescueConfig;
 
 use crate::sponge::Absorb;
@@ -114,11 +114,13 @@ impl<F: PrimeField + Absorb> AllocVar<RescueConfig<F>, F> for CRHParametersVar<F
     }
 }
 
+/// In order to run the following tests, either run with feature `gr1cs` or `r1cs`. Do not run with both, or the the option `--all-features` as it will cause a compilation error.
+
 #[cfg(test)]
 mod test {
     use core::str::FromStr;
 
-    use crate::crh::rescue::gr1cs_constraints::{CRHGadget, CRHParametersVar, TwoToOneCRHGadget};
+    use crate::crh::rescue::constraints::{CRHGadget, CRHParametersVar, TwoToOneCRHGadget};
     use crate::crh::rescue::{TwoToOneCRH, CRH};
     use crate::crh::{constraints::CRHSchemeGadget, CRHScheme};
     use crate::crh::{constraints::TwoToOneCRHSchemeGadget, TwoToOneCRHScheme};
@@ -172,11 +174,11 @@ mod test {
         let pow_pred = PredicateConstraintSystem::new_polynomial_predicate(
             2,
             vec![
-                (Fr::from(1u8), vec![(5, 0)]),
-                (Fr::from(-1i8), vec![(0, 1)]),
+                (Fr::from(1i8), vec![(0, 5)]),
+                (Fr::from(-1i8), vec![(1, 1)]),
             ],
         );
-        cs.register_predicate("POW", pow_pred).unwrap();
+        cs.register_predicate("XXX", pow_pred).unwrap();
         let mut test_a_g = Vec::new();
         let mut test_b_g = Vec::new();
 

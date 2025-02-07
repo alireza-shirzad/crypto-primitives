@@ -1,10 +1,10 @@
 use crate::Error;
 use ark_std::rand::Rng;
 
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 pub mod elgamal;
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub use constraints::*;
 
 pub trait AsymmetricEncryptionScheme {

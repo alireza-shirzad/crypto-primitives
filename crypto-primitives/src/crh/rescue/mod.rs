@@ -10,10 +10,8 @@ use ark_ff::PrimeField;
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::Rng};
 
 
-#[cfg(feature = "gr1cs")]
-pub mod gr1cs_constraints;
-
-
+#[cfg(any(feature = "gr1cs", feature = "r1cs"))]
+pub mod constraints;
 
 
 /// The Rescue collision-resistant hash function introduced in [SAD20][sad]

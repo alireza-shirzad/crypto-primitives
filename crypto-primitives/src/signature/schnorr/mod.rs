@@ -10,7 +10,7 @@ use ark_std::vec::Vec;
 use ark_std::{hash::Hash, marker::PhantomData, ops::Mul, rand::Rng};
 use digest::Digest;
 
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 
 pub struct Schnorr<C: CurveGroup, D: Digest> {

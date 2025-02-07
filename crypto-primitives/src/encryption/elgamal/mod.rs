@@ -3,7 +3,7 @@ use ark_ec::{AdditiveGroup, CurveGroup};
 use ark_ff::{fields::PrimeField, UniformRand};
 use ark_std::{marker::PhantomData, ops::Mul, rand::Rng};
 
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 
 pub struct ElGamal<C: CurveGroup> {

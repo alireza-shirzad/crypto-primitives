@@ -5,7 +5,7 @@ use digest::Digest;
 
 pub struct Commitment;
 
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 
 impl CommitmentScheme for Commitment {

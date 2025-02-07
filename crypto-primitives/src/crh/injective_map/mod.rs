@@ -10,7 +10,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 use ark_std::{borrow::Borrow, fmt::Debug, hash::Hash, marker::PhantomData, rand::Rng};
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 
 pub trait InjectiveMap<C: CurveGroup> {

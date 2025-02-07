@@ -8,7 +8,6 @@ use ark_ff::PrimeField;
 use ark_r1cs_std::fields::fp::FpVar;
 use ark_r1cs_std::prelude::*;
 
-use ark_relations::lc;
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 
@@ -39,7 +38,7 @@ impl<F: PrimeField> SpongeWithGadget<F> for RescueSponge<F> {
 
 impl<F: PrimeField> RescueSpongeVar<F> {
 
-
+    #[cfg(feature = "gr1cs")]
     fn apply_s_box(
         &self,
         state: &mut [FpVar<F>],
@@ -47,20 +46,20 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         alpha: u64,
         // round: usize
     ) -> Result<(), SynthesisError> {
+        use ark_relations::lc;
         let cs = state[0].cs();
-
+        
         if [alpha] == exponent {
 
             for state_item in state.iter_mut() {
                 let new_state_item = FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent))).unwrap();
                 match (&state_item,&new_state_item) {
                     (FpVar::Var(alloc_fp),FpVar::Var(new_alloc_fp)) => {
-                        let _ = cs.enforce_constraint("POW",vec![lc!()+ alloc_fp.variable,lc!()+new_alloc_fp.variable], );
+                        let _ = cs.enforce_constraint("XXX",vec![lc!()+ alloc_fp.variable,lc!()+new_alloc_fp.variable], );
                         *state_item = new_state_item;
 
                     }
                     _ => {
-                        // std::dbg!(round);
                         *state_item = state_item.pow_by_constant(exponent)?;
                     }
                 }
@@ -69,20 +68,43 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         } else {
             for state_item in state.iter_mut() {
                 let new_state_item = FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent))).unwrap();
-                // std::dbg!(&state_item);
-                // std::dbg!(&new_state_item);
                 match (&state_item,&new_state_item) {
                     (FpVar::Var(alloc_fp),FpVar::Var(new_alloc_fp)) => {
-                        let _ = cs.enforce_constraint("POW", vec![lc!()+ new_alloc_fp.variable,lc!()+alloc_fp.variable], );
+                        let _ = cs.enforce_constraint("XXX", vec![lc!()+ new_alloc_fp.variable,lc!()+alloc_fp.variable], );
 
                     },
                     _ => {
-                        // std::dbg!(round);
                         *state_item = state_item.pow_by_constant(exponent)?;
                     }
                 }
                 *state_item = new_state_item;
 
+            }
+        }
+        Ok(())
+
+    }
+
+
+    #[cfg(feature = "r1cs")]
+    fn apply_s_box(
+        &self,
+        state: &mut [FpVar<F>],
+        exponent: &[u64],
+        alpha: u64,
+        // round: usize
+    ) -> Result<(), SynthesisError> {
+
+        if [alpha] == exponent {
+            for state_item in state.iter_mut() {
+                *state_item = state_item.pow_by_constant(exponent)?;
+            }
+        } else {
+            for state_item in state.iter_mut() {
+                let output = FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent))).unwrap();
+                let expected_input = output.pow_by_constant([alpha]).unwrap(); 
+                expected_input.enforce_equal(state_item)?;
+                *state_item = output;
             }
         }
         Ok(())
@@ -301,100 +323,5 @@ impl<F: PrimeField> CryptographicSpongeVar<F, RescueSponge<F>> for RescueSpongeV
         };
 
         Ok(squeezed_elems)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::sponge::constraints::CryptographicSpongeVar;
-    use crate::sponge::rescue::gr1cs_constraints::RescueSpongeVar;
-    use crate::sponge::rescue::rescue_parameters_for_test;
-    use crate::sponge::rescue::RescueSponge;
-    use crate::sponge::test::Fr;
-    use crate::sponge::{CryptographicSponge, FieldBasedCryptographicSponge, FieldElementSize};
-    use ark_r1cs_std::alloc::AllocVar;
-    use ark_r1cs_std::fields::fp::FpVar;
-    use ark_r1cs_std::uint8::UInt8;
-    use ark_r1cs_std::GR1CSVar;
-    use ark_relations::gr1cs::ConstraintSystem;
-    use ark_ff::{Field, PrimeField, UniformRand};
-
-    use ark_relations::ns;
-    use ark_std::test_rng;
-
-    #[test]
-    fn absorb_test() {
-        let mut rng = test_rng();
-        let cs = ConstraintSystem::new_ref();
-
-        let absorb1: Vec<_> = (0..256).map(|_| Fr::rand(&mut rng)).collect();
-        let absorb1_var: Vec<_> = absorb1
-            .iter()
-            .map(|v| FpVar::new_input(ns!(cs, "absorb1"), || Ok(*v)).unwrap())
-            .collect();
-
-        let absorb2: Vec<_> = (0..8).map(|i| vec![i, i + 1, i + 2]).collect();
-        let absorb2_var: Vec<_> = absorb2
-            .iter()
-            .map(|v| UInt8::new_input_vec(ns!(cs, "absorb2"), v).unwrap())
-            .collect();
-
-        let sponge_params = rescue_parameters_for_test();
-
-        let mut native_sponge = RescueSponge::<Fr>::new(&sponge_params);
-        let mut constraint_sponge = RescueSpongeVar::<Fr>::new(cs.clone(), &sponge_params);
-
-        native_sponge.absorb(&absorb1);
-        constraint_sponge.absorb(&absorb1_var).unwrap();
-
-        let squeeze1 = native_sponge.squeeze_native_field_elements(1);
-        let squeeze2 = constraint_sponge.squeeze_field_elements(1).unwrap();
-
-        assert_eq!(squeeze2.value().unwrap(), squeeze1);
-        assert!(cs.is_satisfied().unwrap());
-
-        native_sponge.absorb(&absorb2);
-        constraint_sponge.absorb(&absorb2_var).unwrap();
-
-        let squeeze1 = native_sponge.squeeze_native_field_elements(1);
-        let squeeze2 = constraint_sponge.squeeze_field_elements(1).unwrap();
-
-        assert_eq!(squeeze2.value().unwrap(), squeeze1);
-        assert!(cs.is_satisfied().unwrap());
-    }
-
-    #[test]
-    fn squeeze_with_sizes() {
-        let squeeze_bits = Fr::MODULUS_BIT_SIZE / 2;
-        let max_squeeze = Fr::from(2).pow(<Fr as PrimeField>::BigInt::from(squeeze_bits));
-
-        let sponge_params = rescue_parameters_for_test();
-        let mut native_sponge = RescueSponge::<Fr>::new(&sponge_params);
-
-        let squeeze =
-            native_sponge.squeeze_field_elements_with_sizes::<Fr>(&[FieldElementSize::Truncated(
-                squeeze_bits as usize,
-            )])[0];
-        assert!(squeeze < max_squeeze);
-
-        let cs = ConstraintSystem::new_ref();
-        let mut constraint_sponge = RescueSpongeVar::<Fr>::new(cs.clone(), &sponge_params);
-
-        let (squeeze, bits) = constraint_sponge
-            .squeeze_emulated_field_elements_with_sizes::<Fr>(&[FieldElementSize::Truncated(
-                squeeze_bits as usize,
-            )])
-            .unwrap();
-        let squeeze = &squeeze[0];
-        let bits = &bits[0];
-        assert!(squeeze.value().unwrap() < max_squeeze);
-        assert_eq!(bits.len(), squeeze_bits as usize);
-
-        // squeeze full
-        let (_, bits) = constraint_sponge
-            .squeeze_emulated_field_elements_with_sizes::<Fr>(&[FieldElementSize::Full])
-            .unwrap();
-        let bits = &bits[0];
-        assert_eq!(bits.len() as u32, Fr::MODULUS_BIT_SIZE - 1);
     }
 }

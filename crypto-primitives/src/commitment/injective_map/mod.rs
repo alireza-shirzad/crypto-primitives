@@ -6,7 +6,7 @@ use crate::{
 use ark_ec::CurveGroup;
 use ark_std::{marker::PhantomData, rand::Rng};
 
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 
 pub struct PedersenCommCompressor<C: CurveGroup, I: InjectiveMap<C>, W: pedersen::Window> {

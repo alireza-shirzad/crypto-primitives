@@ -1,4 +1,4 @@
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 mod constraints;
 mod test_utils;
 

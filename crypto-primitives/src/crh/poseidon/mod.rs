@@ -9,7 +9,7 @@ use crate::{
 use ark_ff::PrimeField;
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::Rng};
 
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 //TODO: CHange this r1cs to gr1cs in the future in a seperate PR
 pub struct CRH<F: PrimeField + Absorb> {

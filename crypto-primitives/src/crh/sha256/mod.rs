@@ -10,7 +10,7 @@ use sha2::digest::Digest;
 // Re-export the RustCrypto Sha256 type and its associated traits
 pub use sha2::{digest, Sha256};
 
-#[cfg(feature = "gr1cs")]
+#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
 pub mod constraints;
 
 // Implement the CRH traits for SHA-256
