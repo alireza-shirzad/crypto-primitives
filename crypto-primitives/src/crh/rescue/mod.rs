@@ -8,7 +8,7 @@ use crate::{
 };
 use ark_ff::PrimeField;
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::Rng};
-
+use ark_std::vec::Vec;
 #[cfg(any(feature = "gr1cs", feature = "r1cs"))]
 pub mod constraints;
 
@@ -43,7 +43,7 @@ impl<F: PrimeField + Absorb> CRHScheme for CRH<F> {
 
         let mut sponge = RescueSponge::new(parameters);
         sponge.absorb(&input);
-        let res = sponge.squeeze_field_elements::<F>(1);
+        let res: Vec<F> = sponge.squeeze_field_elements::<F>(parameters.output_size);
         Ok(res[0])
     }
 }
@@ -91,7 +91,7 @@ impl<F: PrimeField + Absorb> TwoToOneCRHScheme for TwoToOneCRH<F> {
         let mut sponge = RescueSponge::new(parameters);
         sponge.absorb(left_input);
         sponge.absorb(right_input);
-        let res = sponge.squeeze_field_elements::<F>(1);
+        let res = sponge.squeeze_field_elements::<F>(parameters.output_size);
         Ok(res[0])
     }
 }

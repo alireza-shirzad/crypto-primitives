@@ -94,7 +94,7 @@ impl<F: PrimeField + Absorb> TwoToOneCRHGadgetTrait<TwoToOneCRH<F>, F> for TwoTo
             let mut sponge = RescueSpongeVar::new(cs, &parameters.parameters);
             sponge.absorb(left_input)?;
             sponge.absorb(right_input)?;
-            let res = sponge.squeeze_field_elements(1)?;
+            let res = sponge.squeeze_field_elements(parameters.parameters.output_size)?;
             Ok(res[0].clone())
         }
     }
@@ -118,54 +118,30 @@ impl<F: PrimeField + Absorb> AllocVar<RescueConfig<F>, F> for CRHParametersVar<F
 
 #[cfg(test)]
 mod test {
-    use core::str::FromStr;
 
     use crate::crh::rescue::constraints::{CRHGadget, CRHParametersVar, TwoToOneCRHGadget};
     use crate::crh::rescue::{TwoToOneCRH, CRH};
     use crate::crh::{constraints::CRHSchemeGadget, CRHScheme};
     use crate::crh::{constraints::TwoToOneCRHSchemeGadget, TwoToOneCRHScheme};
     use crate::sponge::rescue::RescueConfig;
-    use ark_bls12_381::Fr;
-    use ark_ff::UniformRand;
+    use ark_bls12_377::Fr;
+    use ark_ff:: UniformRand;
     use ark_r1cs_std::alloc::AllocVar;
     use ark_r1cs_std::fields::fp::{AllocatedFp, FpVar};
     use ark_r1cs_std::GR1CSVar;
     use ark_relations::gr1cs::predicate::PredicateConstraintSystem;
     use ark_relations::gr1cs::ConstraintSystem;
-    use num_bigint::BigUint;
 
     #[test]
     fn test_consistency() {
         let mut test_rng = ark_std::test_rng();
-
-        // The following way of generating the MDS matrix is incorrect
-        // and is only for test purposes.
-
-        let mut mds = vec![vec![]; 4];
-        for i in 0..4 {
-            for _ in 0..4 {
-                mds[i].push(Fr::rand(&mut test_rng));
-            }
-        }
-
-        let mut ark = vec![vec![]; 25];
-        for i in 0..25 {
-            for _ in 0..4 {
-                ark[i].push(Fr::rand(&mut test_rng));
-            }
-        }
-
         let mut test_a = Vec::new();
         let mut test_b = Vec::new();
         for _ in 0..9 {
             test_a.push(Fr::rand(&mut test_rng));
             test_b.push(Fr::rand(&mut test_rng));
         }
-        let alpha_inv: BigUint = BigUint::from_str(
-            "20974350070050476191779096203274386335076221000211055129041463479975432473805",
-        )
-        .unwrap();
-        let params = RescueConfig::<Fr>::new(12, 5, alpha_inv, mds, ark, 3, 1);
+        let params = RescueConfig::<Fr>::test_conf();
         let crh_a = CRH::<Fr>::evaluate(&params, test_a.clone()).unwrap();
         let crh_b = CRH::<Fr>::evaluate(&params, test_b.clone()).unwrap();
         let crh = TwoToOneCRH::<Fr>::compress(&params, crh_a, crh_b).unwrap();

@@ -36,7 +36,7 @@ impl<F: PrimeField> SpongeWithGadget<F> for RescueSponge<F> {
 }
 
 impl<F: PrimeField> RescueSpongeVar<F> {
-    #[cfg(feature = "gr1cs")]
+    #[cfg(all(feature = "gr1cs", not(feature = "r1cs")))]
     fn apply_s_box(
         &self,
         state: &mut [FpVar<F>],

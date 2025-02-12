@@ -13,6 +13,7 @@ use ark_std::vec::Vec;
 #[cfg(any(feature = "gr1cs", feature = "r1cs"))]
 pub mod constraints;
 
+// use digest::Output;
 use num_bigint::BigUint;
 
 /// Config and RNG used
@@ -35,6 +36,8 @@ pub struct RescueConfig<F: PrimeField> {
     pub rate: usize,
     /// The capacity (in terms of number of field elements).
     pub capacity: usize,
+    // /// The number of field elements to output.
+    pub output_size: usize,
 }
 
 #[derive(Clone)]
@@ -173,6 +176,7 @@ impl<F: PrimeField> RescueConfig<F> {
         arc: Vec<Vec<F>>,
         rate: usize,
         capacity: usize,
+        output_size: usize,
     ) -> Self {
         assert_eq!(arc.len(), 2 * rounds + 1);
         for item in &arc {
@@ -190,7 +194,40 @@ impl<F: PrimeField> RescueConfig<F> {
             arc,
             rate,
             capacity,
+            output_size,
         }
+    }
+
+
+    // This is a temporary config to use for Garuda and Pari Benchamrks
+    // It has several issues inclusing: alpha is fixed to 5 now. It shouldn't be fixed.
+    // Also, the output length is not used at the moment and only one output is returned.
+    #[allow(clippy::too_many_arguments)]
+    pub fn test_conf() -> Self
+    where
+        num_bigint::BigUint: std::convert::From<<F as ark_ff::PrimeField>::BigInt>,
+    {
+        let mut test_rng = ark_std::test_rng();
+
+        // The following way of generating the MDS matrix is incorrect
+        // and is only for test purposes.
+
+        let mut mds = vec![vec![]; 4];
+        for i in 0..4 {
+            for _ in 0..4 {
+                mds[i].push(F::rand(&mut test_rng));
+            }
+        }
+
+        let mut ark = vec![vec![]; 25];
+        for i in 0..25 {
+            for _ in 0..4 {
+                ark[i].push(F::rand(&mut test_rng));
+            }
+        }
+        let modulus = BigUint::from(F::MODULUS);
+        let alpha_inv = BigUint::from(5u8.into()).modinv(&(&modulus-BigUint::from(1u8.into()))).unwrap();
+        Self::new(12, 5, alpha_inv, mds, ark, 3, 1, 1)
     }
 }
 
