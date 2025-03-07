@@ -205,7 +205,7 @@ impl<F: PrimeField> RescueConfig<F> {
     #[allow(clippy::too_many_arguments)]
     pub fn test_conf() -> Self
     where
-        num_bigint::BigUint: std::convert::From<<F as ark_ff::PrimeField>::BigInt>,
+        num_bigint::BigUint: ark_std::convert::From<<F as ark_ff::PrimeField>::BigInt>,
     {
         let mut test_rng = ark_std::test_rng();
 
