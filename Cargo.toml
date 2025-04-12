@@ -40,8 +40,3 @@ incremental = true
 debug-assertions = true
 debug = true
 
-
-[patch.crates-io]
-ark-relations = { git = "https://github.com/arkworks-rs/snark" }
-ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std" }
-ark-snark = { git = "https://github.com/arkworks-rs/snark" }
