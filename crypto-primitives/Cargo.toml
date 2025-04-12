@@ -117,3 +117,4 @@ name = "merkle_tree"
 path = "benches/merkle_tree.rs"
 harness = false
 required-features = ["merkle_tree"]
+

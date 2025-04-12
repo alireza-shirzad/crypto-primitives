@@ -1,18 +1,15 @@
 [workspace]
-members = [
-    "crypto-primitives",
-    "macros",
-]
+members = ["crypto-primitives", "macros"]
 resolver = "2"
 
 [workspace.package]
 version = "0.5.0"
-authors = [ "arkworks contributors" ]
+authors = ["arkworks contributors"]
 description = "A library of useful cryptographic primitives"
 homepage = "https://arkworks.rs"
 repository = "https://github.com/arkworks-rs/crypto-primitives"
 documentation = "https://docs.rs/ark-crypto-primitives/"
-keywords = [ "gr1cs", "pedersen", "blake2s", "snark", "schnorr" ]
+keywords = ["gr1cs", "pedersen", "blake2s", "snark", "schnorr"]
 categories = ["cryptography"]
 include = ["Cargo.toml", "src", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
 license = "MIT/Apache-2.0"
@@ -42,3 +39,9 @@ lto = "thin"
 incremental = true
 debug-assertions = true
 debug = true
+
+
+[patch.crates-io]
+ark-relations = { git = "https://github.com/alireza-shirzad/snark" }
+ark-r1cs-std = { git = "https://github.com/alireza-shirzad/r1cs-std" }
+ark-snark = { git = "https://github.com/alireza-shirzad/snark" }
