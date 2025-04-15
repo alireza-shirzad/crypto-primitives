@@ -50,8 +50,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         if [alpha] == exponent {
             for state_item in state.iter_mut() {
                 let new_state_item =
-                    FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent)))
-                        .unwrap();
+                    FpVar::new_witness(self.cs(), || state_item.value().map(|e| e.pow(exponent)))?;
                 match (&state_item, &new_state_item) {
                     (FpVar::Var(alloc_fp), FpVar::Var(new_alloc_fp)) => {
                         let _ = cs.enforce_constraint(
@@ -68,8 +67,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         } else {
             for state_item in state.iter_mut() {
                 let new_state_item =
-                    FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent)))
-                        .unwrap();
+                    FpVar::new_witness(self.cs(), || state_item.value().map(|e| e.pow(exponent)))?;
                 match (&state_item, &new_state_item) {
                     (FpVar::Var(alloc_fp), FpVar::Var(new_alloc_fp)) => {
                         let _ = cs.enforce_constraint(
@@ -102,8 +100,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         } else {
             for state_item in state.iter_mut() {
                 let output =
-                    FpVar::new_witness(self.cs(), || Ok(state_item.value()?.pow(exponent)))
-                        .unwrap();
+                    FpVar::new_witness(self.cs(), || state_item.value().map(|e| e.pow(exponent)))?;
                 let expected_input = output.pow_by_constant([alpha]).unwrap();
                 expected_input.enforce_equal(state_item)?;
                 *state_item = output;
