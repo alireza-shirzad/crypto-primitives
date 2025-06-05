@@ -78,7 +78,7 @@ pub fn bits_le_to_emulated<'a, F: PrimeField, CF: PrimeField>(
             let gadget =
                 AllocatedFp::new_witness(ark_relations::ns!(cs, "alloc"), || Ok(val[k])).unwrap();
             lc[k] = lc[k].clone() - (CF::one(), gadget.variable);
-            cs.enforce_r1cs_constraint(lc!(), lc!(), lc[k].clone())
+            cs.enforce_r1cs_constraint(|| lc!(), || lc!(), || lc[k].clone())
                 .unwrap();
             limbs.push(FpVar::<CF>::from(gadget));
         }

@@ -40,3 +40,13 @@ incremental = true
 debug-assertions = true
 debug = true
 
+[patch.crates-io]
+ark-relations = { path = "../snark/relations", default-features = true }
+ark-r1cs-std = { path = "../r1cs-std", default-features = true }
+
+[patch."https://github.com/arkworks-rs/snark"]
+ark-snark = { path = "../snark/snark", default-features = true }
+ark-relations = { path = "../snark/relations", default-features = true }
+
+[patch."https://github.com/arkworks-rs/r1cs-std"]
+ark-r1cs-std = { path = "../r1cs-std", default-features = true }

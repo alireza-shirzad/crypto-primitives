@@ -632,7 +632,7 @@ where
 
                     let limb = AllocatedFp::<CF>::new_witness(ns!(cs, "limb"), || Ok(limb_value))?;
                     lc = lc - limb.variable;
-                    cs.enforce_r1cs_constraint(lc!(), lc!(), lc).unwrap();
+                    cs.enforce_r1cs_constraint(|| lc!(), || lc!(), || lc).unwrap();
 
                     limbs.push(FpVar::from(limb));
                 }
