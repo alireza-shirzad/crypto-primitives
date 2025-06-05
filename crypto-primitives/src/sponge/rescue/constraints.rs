@@ -50,7 +50,9 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         if is_forward_pass {
             for state_item in state {
                 if let FpVar::Var(ref fp) = state_item {
-                    let new_state_item = state_item.pow_by_constant(&[self.parameters.alpha])?;
+                    let new_state_item = FpVar::new_witness(cs.clone(), || {
+                        state_item.value().map(|e| e.pow(&self.parameters.alpha))
+                    })?;
                     let FpVar::Var(ref new_fp) = new_state_item else {
                         return Err(SynthesisError::AssignmentMissing);
                     };
@@ -58,6 +60,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                     *state_item = new_state_item;
                 } else {
                     // If the state item is a constant, we can just raise it to the power of alpha.
+                    assert!(state_item.is_constant());
                     *state_item = state_item.pow_by_constant(&[self.parameters.alpha])?;
                 }
             }
@@ -75,6 +78,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                     *state_item = new_state_item;
                 } else {
                     // If the state item is a constant, we can just raise it to alpha_inv.
+                    assert!(state_item.is_constant());
                     *state_item = state_item.pow_by_constant(&alpha_inv)?;
                 }
             }
