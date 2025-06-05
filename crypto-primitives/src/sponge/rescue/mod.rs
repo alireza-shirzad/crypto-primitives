@@ -198,7 +198,6 @@ impl<F: PrimeField> RescueConfig<F> {
         }
     }
 
-
     // This is a temporary config to use for Garuda and Pari Benchamrks
     // It has several issues inclusing: alpha is fixed to 5 now. It shouldn't be fixed.
     // Also, the output length is not used at the moment and only one output is returned.
@@ -226,7 +225,9 @@ impl<F: PrimeField> RescueConfig<F> {
             }
         }
         let modulus = BigUint::from(F::MODULUS);
-        let alpha_inv = BigUint::from(5u8.into()).modinv(&(&modulus-BigUint::from(1u8.into()))).unwrap();
+        let alpha_inv = BigUint::from(5u8.into())
+            .modinv(&(&modulus - BigUint::from(1u8.into())))
+            .unwrap();
         Self::new(12, 5, alpha_inv, mds, ark, 3, 1, 1)
     }
 }
