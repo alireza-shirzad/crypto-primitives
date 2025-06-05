@@ -48,30 +48,30 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         let cs = state[0].cs();
 
         if is_forward_pass {
-            for state_item in &mut state {
-                if let FpVar::Var(alloc_fp) = state_item {
-                    let new_state_item = state_item.pow_by_constant(&self.parameters.alpha)?;
-                    let FpVar::Var(new_alloc_fp) = new_state_item else {
+            for state_item in state {
+                if let FpVar::Var(ref fp) = state_item {
+                    let new_state_item = state_item.pow_by_constant(&[self.parameters.alpha])?;
+                    let FpVar::Var(ref new_fp) = new_state_item else {
                         return Err(SynthesisError::AssignmentMissing);
                     };
-                    cs.enforce_constraint("XXX", [lc!() + alloc_fp.variable, lc!() + new_alloc_fp.variable])?;
+                    cs.enforce_constraint("XXX", [lc!() + fp.variable, lc!() + new_fp.variable])?;
                     *state_item = new_state_item;
                 } else {
                     // If the state item is a constant, we can just raise it to the power of alpha.
-                    *state_item = state_item.pow_by_constant(&self.parameters.alpha)?;
+                    *state_item = state_item.pow_by_constant(&[self.parameters.alpha])?;
                 }
             }
         } else {
             let alpha_inv = self.parameters.alpha_inv.to_u64_digits();
-            for state_item in &mut state {
-                if let FpVar::Var(alloc_fp) = state_item {
+            for state_item in state {
+                if let FpVar::Var(ref fp) = state_item {
                     let new_state_item = FpVar::new_witness(cs.clone(), || {
-                        state_item.value().map(|e| e.pow(alpha_inv))
+                        state_item.value().map(|e| e.pow(&alpha_inv))
                     })?;
-                    let FpVar::Var(new_alloc_fp) = new_state_item else {
+                    let FpVar::Var(ref new_fp) = new_state_item else {
                         return Err(SynthesisError::AssignmentMissing);
                     };
-                    cs.enforce_constraint("XXX", [lc!() + new_alloc_fp.variable, lc!() + alloc_fp.variable])?;
+                    cs.enforce_constraint("XXX", [lc!() + new_fp.variable, lc!() + fp.variable])?;
                     *state_item = new_state_item;
                 } else {
                     // If the state item is a constant, we can just raise it to alpha_inv.
