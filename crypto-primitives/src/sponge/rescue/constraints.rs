@@ -56,7 +56,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                     let FpVar::Var(ref new_fp) = new_state_item else {
                         return Err(SynthesisError::AssignmentMissing);
                     };
-                    cs.enforce_constraint("XXX", [lc!() + fp.variable, lc!() + new_fp.variable])?;
+                    cs.enforce_constraint("XXX", || lc![fp.variable], || lc![new_fp.variable])?;
                     *state_item = new_state_item;
                 } else {
                     // If the state item is a constant, we can just raise it to the power of alpha.
@@ -73,7 +73,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                     let FpVar::Var(ref new_fp) = new_state_item else {
                         return Err(SynthesisError::AssignmentMissing);
                     };
-                    cs.enforce_constraint("XXX", [lc!() + new_fp.variable, lc!() + fp.variable])?;
+                    cs.enforce_constraint("XXX", || lc![new_fp.variable], lc![fp.variable])?;
                     *state_item = new_state_item;
                 } else {
                     // If the state item is a constant, we can just raise it to alpha_inv.
@@ -102,9 +102,8 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                     state_item
                         .value()
                         .map(|e| e.pow(self.parameters.alpha_inv.to_u64_digits()))
-                })
-                .unwrap();
-                let expected_input = output.pow_by_constant([alpha]).unwrap();
+                })?;
+                let expected_input = output.pow_by_constant([alpha])?;
                 expected_input.enforce_equal(state_item)?;
                 *state_item = output;
             }
@@ -139,15 +138,15 @@ impl<F: PrimeField> RescueSpongeVar<F> {
     #[tracing::instrument(target = "gr1cs", skip(self))]
     fn permute(&mut self) -> Result<(), SynthesisError> {
         let mut state = self.state.clone();
-        let _ = self.apply_ark(&mut state, &self.parameters.arc[0]);
+        self.apply_ark(&mut state, &self.parameters.arc[0])?;
         for (round, round_key) in self.parameters.arc[1..].iter().enumerate() {
             if (round % 2) == 0 {
                 self.apply_s_box(&mut state, self.parameters.alpha, false)?;
             } else {
                 self.apply_s_box(&mut state, self.parameters.alpha, true)?;
             }
-            let _ = self.apply_mds(&mut state);
-            let _ = self.apply_ark(&mut state, round_key);
+            self.apply_mds(&mut state)?;
+            self.apply_ark(&mut state, round_key)?;
         }
         self.state = state;
         Ok(())
