@@ -125,7 +125,7 @@ mod test {
     use crate::crh::{constraints::TwoToOneCRHSchemeGadget, TwoToOneCRHScheme};
     use crate::sponge::rescue::RescueConfig;
     use ark_bls12_377::Fr;
-    use ark_ff:: UniformRand;
+    use ark_ff::UniformRand;
     use ark_r1cs_std::alloc::AllocVar;
     use ark_r1cs_std::fields::fp::{AllocatedFp, FpVar};
     use ark_r1cs_std::GR1CSVar;
@@ -147,7 +147,7 @@ mod test {
         let crh = TwoToOneCRH::<Fr>::compress(&params, crh_a, crh_b).unwrap();
 
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let pow_pred = PredicateConstraintSystem::new_polynomial_predicate(
+        let pow_pred = PredicateConstraintSystem::new_polynomial_predicate_cs(
             2,
             vec![
                 (Fr::from(1i8), vec![(0, 5)]),
