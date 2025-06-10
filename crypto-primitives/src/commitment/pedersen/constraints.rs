@@ -138,68 +138,68 @@ where
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use ark_ed_on_bls12_381::{constraints::EdwardsVar, EdwardsProjective as JubJub, Fq, Fr};
-//     use ark_std::{test_rng, UniformRand};
+#[cfg(test)]
+mod test {
+    use ark_ed_on_bls12_381::{constraints::EdwardsVar, EdwardsProjective as JubJub, Fq, Fr};
+    use ark_std::{test_rng, UniformRand};
 
-//     use crate::{
-//         commitment::{
-//             pedersen::{constraints::CommGadget, Commitment, Randomness},
-//             CommitmentGadget, CommitmentScheme,
-//         },
-//         crh::pedersen,
-//     };
-//     use ark_r1cs_std::prelude::*;
-//     use ark_relations::gr1cs::ConstraintSystem;
+    use crate::{
+        commitment::{
+            pedersen::{constraints::CommGadget, Commitment, Randomness},
+            CommitmentGadget, CommitmentScheme,
+        },
+        crh::pedersen,
+    };
+    use ark_r1cs_std::prelude::*;
+    use ark_relations::gr1cs::ConstraintSystem;
 
-//     /// Checks that the primitive Pedersen commitment matches the gadget version
-//     #[test]
-//     fn commitment_gadget_test() {
-//         let cs = ConstraintSystem::<Fq>::new_ref();
+    /// Checks that the primitive Pedersen commitment matches the gadget version
+    #[test]
+    fn commitment_gadget_test() {
+        let cs = ConstraintSystem::<Fq>::new_ref();
 
-//         #[derive(Clone, PartialEq, Eq, Hash)]
-//         pub(super) struct Window;
+        #[derive(Clone, PartialEq, Eq, Hash)]
+        pub(super) struct Window;
 
-//         impl pedersen::Window for Window {
-//             const WINDOW_SIZE: usize = 4;
-//             const NUM_WINDOWS: usize = 9;
-//         }
+        impl pedersen::Window for Window {
+            const WINDOW_SIZE: usize = 4;
+            const NUM_WINDOWS: usize = 9;
+        }
 
-//         let input = [1u8; 4];
+        let input = [1u8; 4];
 
-//         let rng = &mut test_rng();
+        let rng = &mut test_rng();
 
-//         type TestCOMM = Commitment<JubJub, Window>;
-//         type TestCOMMGadget = CommGadget<JubJub, EdwardsVar, Window>;
+        type TestCOMM = Commitment<JubJub, Window>;
+        type TestCOMMGadget = CommGadget<JubJub, EdwardsVar, Window>;
 
-//         let randomness = Randomness(Fr::rand(rng));
+        let randomness = Randomness(Fr::rand(rng));
 
-//         let parameters = Commitment::<JubJub, Window>::setup(rng).unwrap();
-//         let primitive_result =
-//             Commitment::<JubJub, Window>::commit(&parameters, &input, &randomness).unwrap();
+        let parameters = Commitment::<JubJub, Window>::setup(rng).unwrap();
+        let primitive_result =
+            Commitment::<JubJub, Window>::commit(&parameters, &input, &randomness).unwrap();
 
-//         let mut input_var = vec![];
-//         for input_byte in input.iter() {
-//             input_var.push(UInt8::new_witness(cs.clone(), || Ok(*input_byte)).unwrap());
-//         }
+        let mut input_var = vec![];
+        for input_byte in input.iter() {
+            input_var.push(UInt8::new_witness(cs.clone(), || Ok(*input_byte)).unwrap());
+        }
 
-//         let randomness_var =
-//             <TestCOMMGadget as CommitmentGadget<TestCOMM, Fq>>::RandomnessVar::new_witness(
-//                 ark_relations::ns!(cs, "gadget_randomness"),
-//                 || Ok(&randomness),
-//             )
-//             .unwrap();
-//         let parameters_var =
-//             <TestCOMMGadget as CommitmentGadget<TestCOMM, Fq>>::ParametersVar::new_witness(
-//                 ark_relations::ns!(cs, "gadget_parameters"),
-//                 || Ok(&parameters),
-//             )
-//             .unwrap();
-//         let result_var =
-//             TestCOMMGadget::commit(&parameters_var, &input_var, &randomness_var).unwrap();
+        let randomness_var =
+            <TestCOMMGadget as CommitmentGadget<TestCOMM, Fq>>::RandomnessVar::new_witness(
+                ark_relations::ns!(cs, "gadget_randomness"),
+                || Ok(&randomness),
+            )
+            .unwrap();
+        let parameters_var =
+            <TestCOMMGadget as CommitmentGadget<TestCOMM, Fq>>::ParametersVar::new_witness(
+                ark_relations::ns!(cs, "gadget_parameters"),
+                || Ok(&parameters),
+            )
+            .unwrap();
+        let result_var =
+            TestCOMMGadget::commit(&parameters_var, &input_var, &randomness_var).unwrap();
 
-//         assert_eq!(primitive_result, result_var.value().unwrap());
-//         assert!(cs.is_satisfied().unwrap());
-//     }
-// }
+        assert_eq!(primitive_result, result_var.value().unwrap());
+        assert!(cs.is_satisfied().unwrap());
+    }
+}

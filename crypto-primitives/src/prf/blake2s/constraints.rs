@@ -444,7 +444,7 @@ mod test {
 
         if !cs.is_satisfied().unwrap() {
             println!(
-                "which predicate is unsatisfied: {:?}",
+                "which constraint is unsatisfied: {:?}",
                 cs.which_is_unsatisfied().unwrap()
             );
         }

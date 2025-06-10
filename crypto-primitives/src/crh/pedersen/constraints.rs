@@ -149,101 +149,101 @@ where
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use crate::crh::{
-//         pedersen, CRHScheme, CRHSchemeGadget, TwoToOneCRHScheme, TwoToOneCRHSchemeGadget,
-//     };
-//     use ark_ec::CurveGroup;
-//     use ark_ed_on_bls12_381::{constraints::EdwardsVar, EdwardsProjective as JubJub, Fq as Fr};
-//     use ark_r1cs_std::prelude::*;
-//     use ark_relations::gr1cs::{ConstraintSystem, ConstraintSystemRef};
-//     use ark_std::rand::Rng;
-//     use ark_std::{test_rng, UniformRand};
+#[cfg(test)]
+mod test {
+    use crate::crh::{
+        pedersen, CRHScheme, CRHSchemeGadget, TwoToOneCRHScheme, TwoToOneCRHSchemeGadget,
+    };
+    use ark_ec::CurveGroup;
+    use ark_ed_on_bls12_381::{constraints::EdwardsVar, EdwardsProjective as JubJub, Fq as Fr};
+    use ark_r1cs_std::prelude::*;
+    use ark_relations::gr1cs::{ConstraintSystem, ConstraintSystemRef};
+    use ark_std::rand::Rng;
+    use ark_std::{test_rng, UniformRand};
 
-//     type TestCRH = pedersen::CRH<JubJub, Window>;
-//     type TestCRHGadget = pedersen::constraints::CRHGadget<JubJub, EdwardsVar, Window>;
+    type TestCRH = pedersen::CRH<JubJub, Window>;
+    type TestCRHGadget = pedersen::constraints::CRHGadget<JubJub, EdwardsVar, Window>;
 
-//     type TestTwoToOneCRH = pedersen::TwoToOneCRH<JubJub, Window>;
-//     type TestTwoToOneCRHGadget =
-//         pedersen::constraints::TwoToOneCRHGadget<JubJub, EdwardsVar, Window>;
+    type TestTwoToOneCRH = pedersen::TwoToOneCRH<JubJub, Window>;
+    type TestTwoToOneCRHGadget =
+        pedersen::constraints::TwoToOneCRHGadget<JubJub, EdwardsVar, Window>;
 
-//     #[derive(Clone, PartialEq, Eq, Hash)]
-//     pub(super) struct Window;
+    #[derive(Clone, PartialEq, Eq, Hash)]
+    pub(super) struct Window;
 
-//     impl pedersen::Window for Window {
-//         const WINDOW_SIZE: usize = 127;
-//         const NUM_WINDOWS: usize = 9;
-//     }
+    impl pedersen::Window for Window {
+        const WINDOW_SIZE: usize = 127;
+        const NUM_WINDOWS: usize = 9;
+    }
 
-//     fn generate_u8_input<R: Rng>(
-//         cs: ConstraintSystemRef<Fr>,
-//         size: usize,
-//         rng: &mut R,
-//     ) -> (Vec<u8>, Vec<UInt8<Fr>>) {
-//         let mut input = vec![1u8; size];
-//         rng.fill_bytes(&mut input);
+    fn generate_u8_input<R: Rng>(
+        cs: ConstraintSystemRef<Fr>,
+        size: usize,
+        rng: &mut R,
+    ) -> (Vec<u8>, Vec<UInt8<Fr>>) {
+        let mut input = vec![1u8; size];
+        rng.fill_bytes(&mut input);
 
-//         let mut input_bytes = vec![];
-//         for byte in input.iter() {
-//             input_bytes.push(UInt8::new_witness(cs.clone(), || Ok(byte)).unwrap());
-//         }
-//         (input, input_bytes)
-//     }
+        let mut input_bytes = vec![];
+        for byte in input.iter() {
+            input_bytes.push(UInt8::new_witness(cs.clone(), || Ok(byte)).unwrap());
+        }
+        (input, input_bytes)
+    }
 
-//     fn generate_affine<R: Rng>(
-//         cs: ConstraintSystemRef<Fr>,
-//         rng: &mut R,
-//     ) -> (<JubJub as CurveGroup>::Affine, EdwardsVar) {
-//         let val = <JubJub as CurveGroup>::Affine::rand(rng);
-//         let val_var = EdwardsVar::new_witness(cs.clone(), || Ok(val.clone())).unwrap();
-//         (val, val_var)
-//     }
+    fn generate_affine<R: Rng>(
+        cs: ConstraintSystemRef<Fr>,
+        rng: &mut R,
+    ) -> (<JubJub as CurveGroup>::Affine, EdwardsVar) {
+        let val = <JubJub as CurveGroup>::Affine::rand(rng);
+        let val_var = EdwardsVar::new_witness(cs.clone(), || Ok(val.clone())).unwrap();
+        (val, val_var)
+    }
 
-//     #[test]
-//     fn test_native_equality() {
-//         let rng = &mut test_rng();
-//         let cs = ConstraintSystem::<Fr>::new_ref();
+    #[test]
+    fn test_native_equality() {
+        let rng = &mut test_rng();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
-//         let (input, input_var) = generate_u8_input(cs.clone(), 128, rng);
+        let (input, input_var) = generate_u8_input(cs.clone(), 128, rng);
 
-//         let parameters = TestCRH::setup(rng).unwrap();
-//         let primitive_result = TestCRH::evaluate(&parameters, input.as_slice()).unwrap();
+        let parameters = TestCRH::setup(rng).unwrap();
+        let primitive_result = TestCRH::evaluate(&parameters, input.as_slice()).unwrap();
 
-//         let parameters_var = pedersen::constraints::CRHParametersVar::new_constant(
-//             ark_relations::ns!(cs, "CRH Parameters"),
-//             &parameters,
-//         )
-//         .unwrap();
+        let parameters_var = pedersen::constraints::CRHParametersVar::new_constant(
+            ark_relations::ns!(cs, "CRH Parameters"),
+            &parameters,
+        )
+        .unwrap();
 
-//         let result_var = TestCRHGadget::evaluate(&parameters_var, &input_var).unwrap();
+        let result_var = TestCRHGadget::evaluate(&parameters_var, &input_var).unwrap();
 
-//         assert_eq!(primitive_result, result_var.value().unwrap());
-//         assert!(cs.is_satisfied().unwrap());
-//     }
+        assert_eq!(primitive_result, result_var.value().unwrap());
+        assert!(cs.is_satisfied().unwrap());
+    }
 
-//     #[test]
-//     fn test_naive_two_to_one_equality() {
-//         let rng = &mut test_rng();
-//         let cs = ConstraintSystem::<Fr>::new_ref();
+    #[test]
+    fn test_naive_two_to_one_equality() {
+        let rng = &mut test_rng();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
-//         let (left_input, left_input_var) = generate_affine(cs.clone(), rng);
-//         let (right_input, right_input_var) = generate_affine(cs.clone(), rng);
-//         let parameters = TestTwoToOneCRH::setup(rng).unwrap();
-//         let primitive_result =
-//             TestTwoToOneCRH::compress(&parameters, left_input, right_input).unwrap();
+        let (left_input, left_input_var) = generate_affine(cs.clone(), rng);
+        let (right_input, right_input_var) = generate_affine(cs.clone(), rng);
+        let parameters = TestTwoToOneCRH::setup(rng).unwrap();
+        let primitive_result =
+            TestTwoToOneCRH::compress(&parameters, left_input, right_input).unwrap();
 
-//         let parameters_var = pedersen::constraints::CRHParametersVar::new_constant(
-//             ark_relations::ns!(cs, "CRH Parameters"),
-//             &parameters,
-//         )
-//         .unwrap();
+        let parameters_var = pedersen::constraints::CRHParametersVar::new_constant(
+            ark_relations::ns!(cs, "CRH Parameters"),
+            &parameters,
+        )
+        .unwrap();
 
-//         let result_var =
-//             TestTwoToOneCRHGadget::compress(&parameters_var, &left_input_var, &right_input_var)
-//                 .unwrap();
+        let result_var =
+            TestTwoToOneCRHGadget::compress(&parameters_var, &left_input_var, &right_input_var)
+                .unwrap();
 
-//         assert_eq!(primitive_result, result_var.value().unwrap().into_affine());
-//         assert!(cs.is_satisfied().unwrap());
-//     }
-// }
+        assert_eq!(primitive_result, result_var.value().unwrap().into_affine());
+        assert!(cs.is_satisfied().unwrap());
+    }
+}

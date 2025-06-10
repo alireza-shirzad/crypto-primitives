@@ -37,72 +37,72 @@ impl<F: PrimeField> SpongeWithGadget<F> for RescueSponge<F> {
 
 impl<F: PrimeField> RescueSpongeVar<F> {
     #[cfg(all(feature = "gr1cs", not(feature = "r1cs")))]
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn apply_s_box(
         &self,
         state: &mut [FpVar<F>],
-        exponent: &[u64],
         alpha: u64,
-        // round: usize
+        is_forward_pass: bool,
     ) -> Result<(), SynthesisError> {
         use ark_relations::lc;
-        let cs = state[0].cs();
+        let cs = state.iter().fold(ConstraintSystemRef::None, |cs, item| cs.or(item.cs()));
 
-        if [alpha] == exponent {
-            for state_item in state.iter_mut() {
-                let new_state_item =
-                    FpVar::new_witness(self.cs(), || state_item.value().map(|e| e.pow(exponent)))?;
-                match (&state_item, &new_state_item) {
-                    (FpVar::Var(alloc_fp), FpVar::Var(new_alloc_fp)) => {
-                        cs.enforce_constraint_arity_2(
-                            "XXX",
-                            || lc![alloc_fp.variable],
-                            || lc![new_alloc_fp.variable],
-                        )?;
-                        *state_item = new_state_item;
-                    }
-                    _ => {
-                        *state_item = state_item.pow_by_constant(exponent)?;
-                    }
+        if is_forward_pass {
+            for state_item in state {
+                if let FpVar::Var(ref fp) = state_item {
+                    let new_state_item = FpVar::new_witness(cs.clone(), || {
+                        state_item.value().map(|e| e.pow(&[self.parameters.alpha]))
+                    })?;
+                    let FpVar::Var(ref new_fp) = new_state_item else {
+                        return Err(SynthesisError::AssignmentMissing);
+                    };
+                    cs.enforce_constraint("XXX", || lc![fp.variable], || lc![new_fp.variable])?;
+                    *state_item = new_state_item;
+                } else {
+                    // If the state item is a constant, we can just raise it to the power of alpha.
+                    *state_item = state_item.pow_by_constant(&[self.parameters.alpha])?;
                 }
             }
         } else {
-            for state_item in state.iter_mut() {
-                let new_state_item =
-                    FpVar::new_witness(self.cs(), || state_item.value().map(|e| e.pow(exponent)))?;
-                match (&state_item, &new_state_item) {
-                    (FpVar::Var(alloc_fp), FpVar::Var(new_alloc_fp)) => {
-                        cs.enforce_constraint_arity_2(
-                            "XXX",
-                            || lc![new_alloc_fp.variable],
-                            || lc![alloc_fp.variable],
-                        )?;
-                    }
-                    _ => {
-                        *state_item = state_item.pow_by_constant(exponent)?;
-                    }
+            let alpha_inv = self.parameters.alpha_inv.to_u64_digits();
+            for state_item in state {
+                if let FpVar::Var(ref fp) = state_item {
+                    let new_state_item = FpVar::new_witness(cs.clone(), || {
+                        state_item.value().map(|e| e.pow(&alpha_inv))
+                    })?;
+                    let FpVar::Var(ref new_fp) = new_state_item else {
+                        return Err(SynthesisError::AssignmentMissing);
+                    };
+                    cs.enforce_constraint("XXX", || lc![new_fp.variable], lc![fp.variable])?;
+                    *state_item = new_state_item;
+                } else {
+                    // If the state item is a constant, we can just raise it to alpha_inv.
+                    *state_item = state_item.pow_by_constant(&alpha_inv)?;
                 }
-                *state_item = new_state_item;
             }
         }
         Ok(())
     }
 
     #[cfg(feature = "r1cs")]
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn apply_s_box(
         &self,
         state: &mut [FpVar<F>],
-        exponent: &[u64],
         alpha: u64,
-        // round: usize
+        is_forward_pass: bool,
     ) -> Result<(), SynthesisError> {
-        if [alpha] == exponent {
+        if is_forward_pass {
             for state_item in state.iter_mut() {
-                *state_item = state_item.pow_by_constant(exponent)?;
+                *state_item = state_item.pow_by_constant([self.parameters.alpha])?;
             }
         } else {
             for state_item in state.iter_mut() {
-                let output =
-                    FpVar::new_witness(self.cs(), || state_item.value().map(|e| e.pow(exponent)))?;
+                let output = FpVar::new_witness(self.cs(), || {
+                    state_item
+                        .value()
+                        .map(|e| e.pow(self.parameters.alpha_inv.to_u64_digits()))
+                })?;
                 let expected_input = output.pow_by_constant([alpha])?;
                 expected_input.enforce_equal(state_item)?;
                 *state_item = output;
@@ -111,6 +111,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         Ok(())
     }
 
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn apply_ark(&self, state: &mut [FpVar<F>], round_key: &Vec<F>) -> Result<(), SynthesisError> {
         for (i, state_elem) in state.iter_mut().enumerate() {
             *state_elem += round_key[i];
@@ -118,6 +119,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         Ok(())
     }
 
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn apply_mds(&self, state: &mut [FpVar<F>]) -> Result<(), SynthesisError> {
         let mut new_state = Vec::new();
         let zero = FpVar::<F>::zero();
@@ -133,15 +135,15 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         Ok(())
     }
 
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn permute(&mut self) -> Result<(), SynthesisError> {
         let mut state = self.state.clone();
-        let alpha_inv: Vec<u64> = self.parameters.alpha_inv.to_u64_digits();
         self.apply_ark(&mut state, &self.parameters.arc[0])?;
         for (round, round_key) in self.parameters.arc[1..].iter().enumerate() {
             if (round % 2) == 0 {
-                self.apply_s_box(&mut state, &alpha_inv, self.parameters.alpha)?;
+                self.apply_s_box(&mut state, self.parameters.alpha, false)?;
             } else {
-                self.apply_s_box(&mut state, &[self.parameters.alpha], self.parameters.alpha)?;
+                self.apply_s_box(&mut state, self.parameters.alpha, true)?;
             }
             self.apply_mds(&mut state)?;
             self.apply_ark(&mut state, round_key)?;
@@ -150,6 +152,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         Ok(())
     }
 
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn absorb_internal(
         &mut self,
         mut rate_start_index: usize,
@@ -185,6 +188,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
     }
 
     // Squeeze |output| many elements. This does not end in a squeeze
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn squeeze_internal(
         &mut self,
         mut rate_start_index: usize,
@@ -269,6 +273,7 @@ impl<F: PrimeField> CryptographicSpongeVar<F, RescueSponge<F>> for RescueSpongeV
         Ok(())
     }
 
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn squeeze_bytes(&mut self, num_bytes: usize) -> Result<Vec<UInt8<F>>, SynthesisError> {
         let usable_bytes = ((F::MODULUS_BIT_SIZE - 1) / 8) as usize;
 
@@ -284,6 +289,7 @@ impl<F: PrimeField> CryptographicSpongeVar<F, RescueSponge<F>> for RescueSpongeV
         Ok(bytes)
     }
 
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn squeeze_bits(&mut self, num_bits: usize) -> Result<Vec<Boolean<F>>, SynthesisError> {
         let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
 
@@ -299,6 +305,7 @@ impl<F: PrimeField> CryptographicSpongeVar<F, RescueSponge<F>> for RescueSpongeV
         Ok(bits)
     }
 
+    #[tracing::instrument(target = "gr1cs", skip(self))]
     fn squeeze_field_elements(
         &mut self,
         num_elements: usize,
