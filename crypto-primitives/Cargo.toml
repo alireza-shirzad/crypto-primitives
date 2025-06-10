@@ -51,7 +51,6 @@ parallel = [
 r1cs = ["ark-r1cs-std", "tracing"]
 gr1cs = ["ark-r1cs-std", "tracing"]
 crh = ["sponge"]
-asm = ["ark-ff/asm"]
 sponge = ["merlin"]
 commitment = ["crh"]
 merkle_tree = ["crh", "hashbrown"]
@@ -59,7 +58,7 @@ encryption = []
 prf = []
 snark = []
 signature = []
-asm = [ "ark-ff/asm" ]
+asm = ["ark-ff/asm"]
 
 [target.'cfg(all(target_has_atomic = "8", target_has_atomic = "16", target_has_atomic = "32", target_has_atomic = "64", target_has_atomic = "ptr"))'.dependencies]
 ahash = { version = "0.8", default-features = false }
