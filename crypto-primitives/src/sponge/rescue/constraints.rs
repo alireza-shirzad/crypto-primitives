@@ -45,7 +45,9 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         is_forward_pass: bool,
     ) -> Result<(), SynthesisError> {
         use ark_relations::lc;
-        let cs = state.iter().fold(ConstraintSystemRef::None, |cs, item| cs.or(item.cs()));
+        let cs = state
+            .iter()
+            .fold(ConstraintSystemRef::None, |cs, item| cs.or(item.cs()));
 
         if is_forward_pass {
             for state_item in state {
