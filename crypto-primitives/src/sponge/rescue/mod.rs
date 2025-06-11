@@ -225,9 +225,9 @@ impl<F: PrimeField> RescueConfig<F> {
             }
         }
         let modulus = BigUint::from(F::MODULUS);
-        let alpha_inv = BigUint::from(5u8.into())
-            .modinv(&(&modulus - BigUint::from(1u8.into())))
-            .unwrap();
+        let modulus_sub_one = modulus - BigUint::from(1u8.into());
+        dbg!(&modulus_sub_one);
+        let alpha_inv = BigUint::from(5u8.into()).modinv(&modulus_sub_one).unwrap();
         Self::new(12, 5, alpha_inv, mds, ark, 3, 1, 1)
     }
 }

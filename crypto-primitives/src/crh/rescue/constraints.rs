@@ -124,7 +124,7 @@ mod test {
     use crate::crh::{constraints::CRHSchemeGadget, CRHScheme};
     use crate::crh::{constraints::TwoToOneCRHSchemeGadget, TwoToOneCRHScheme};
     use crate::sponge::rescue::RescueConfig;
-    use ark_bls12_377::Fr;
+    use ark_bls12_381::Fr;
     use ark_ff::UniformRand;
     use ark_r1cs_std::alloc::AllocVar;
     use ark_r1cs_std::fields::fp::{AllocatedFp, FpVar};
