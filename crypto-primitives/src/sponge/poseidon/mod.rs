@@ -9,7 +9,7 @@ use ark_std::any::TypeId;
 use ark_std::vec::Vec;
 
 /// constraints for Poseidon
-#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
+#[cfg(feature = "constraints")]
 pub mod constraints;
 #[cfg(test)]
 mod tests;

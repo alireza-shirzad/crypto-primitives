@@ -4,7 +4,7 @@ use ark_std::vec::Vec;
 use blake2::{Blake2s256 as B2s, Blake2sMac};
 use digest::Digest;
 
-#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
+#[cfg(feature = "constraints")]
 pub mod constraints;
 
 #[derive(Clone)]

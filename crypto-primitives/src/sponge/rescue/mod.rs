@@ -10,7 +10,7 @@ use ark_std::any::TypeId;
 use ark_std::vec::Vec;
 
 /// constraints for Rescue
-#[cfg(any(feature = "gr1cs", feature = "r1cs"))]
+#[cfg(feature = "constraints")]
 pub mod constraints;
 
 // use digest::Output;

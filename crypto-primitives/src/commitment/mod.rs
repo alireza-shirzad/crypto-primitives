@@ -7,9 +7,9 @@ pub mod blake2s;
 pub mod injective_map;
 pub mod pedersen;
 
-#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
+#[cfg(feature = "constraints")]
 pub mod constraints;
-#[cfg(any(feature = "r1cs", feature = "gr1cs"))]
+#[cfg(feature = "constraints")]
 pub use constraints::*;
 
 pub trait CommitmentScheme {

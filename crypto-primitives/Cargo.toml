@@ -48,8 +48,7 @@ parallel = [
     "ark-std/parallel",
     "ark-ff/parallel",
 ]
-r1cs = ["ark-r1cs-std", "tracing"]
-gr1cs = ["ark-r1cs-std", "tracing"]
+constraints = ["ark-r1cs-std", "tracing"]
 crh = ["sponge"]
 sponge = ["merlin"]
 commitment = ["crh"]

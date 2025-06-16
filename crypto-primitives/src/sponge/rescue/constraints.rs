@@ -36,7 +36,7 @@ impl<F: PrimeField> SpongeWithGadget<F> for RescueSponge<F> {
 }
 
 impl<F: PrimeField> RescueSpongeVar<F> {
-    #[cfg(all(feature = "gr1cs", not(feature = "r1cs")))]
+    #[cfg(feature = "constraints")]
     #[tracing::instrument(target = "gr1cs", skip(self))]
     fn apply_s_box(
         &self,
@@ -44,57 +44,56 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         alpha: u64,
         is_forward_pass: bool,
     ) -> Result<(), SynthesisError> {
-        use ark_relations::lc;
-        let cs = state
-            .iter()
-            .fold(ConstraintSystemRef::None, |cs, item| cs.or(item.cs()));
+        if self.cs.has_predicate("XXX") {
+            use ark_relations::lc;
 
-        if is_forward_pass {
-            for state_item in state {
-                if let FpVar::Var(ref fp) = state_item {
-                    let new_state_item = FpVar::new_witness(cs.clone(), || {
-                        state_item.value().map(|e| e.pow(&[self.parameters.alpha]))
-                    })?;
-                    let FpVar::Var(ref new_fp) = new_state_item else {
-                        return Err(SynthesisError::AssignmentMissing);
-                    };
-                    cs.enforce_constraint("XXX", || lc![fp.variable], || lc![new_fp.variable])?;
-                    *state_item = new_state_item;
-                } else {
-                    // If the state item is a constant, we can just raise it to the power of alpha.
-                    *state_item = state_item.pow_by_constant(&[self.parameters.alpha])?;
+            let cs = state
+                .iter()
+                .fold(ConstraintSystemRef::None, |cs, item| cs.or(item.cs()));
+
+            if is_forward_pass {
+                for state_item in state {
+                    if let FpVar::Var(ref fp) = state_item {
+                        let new_state_item = FpVar::new_witness(cs.clone(), || {
+                            state_item.value().map(|e| e.pow([self.parameters.alpha]))
+                        })?;
+                        let FpVar::Var(ref new_fp) = new_state_item else {
+                            return Err(SynthesisError::AssignmentMissing);
+                        };
+                        cs.enforce_constraint_arity_2(
+                            "XXX",
+                            || lc![fp.variable],
+                            || lc![new_fp.variable],
+                        )?;
+                        *state_item = new_state_item;
+                    } else {
+                        // If the state item is a constant, we can just raise it to the power of alpha.
+                        *state_item = state_item.pow_by_constant([self.parameters.alpha])?;
+                    }
+                }
+            } else {
+                let alpha_inv = self.parameters.alpha_inv.to_u64_digits();
+                for state_item in state {
+                    if let FpVar::Var(ref fp) = state_item {
+                        let new_state_item = FpVar::new_witness(cs.clone(), || {
+                            state_item.value().map(|e| e.pow(&alpha_inv))
+                        })?;
+                        let FpVar::Var(ref new_fp) = new_state_item else {
+                            return Err(SynthesisError::AssignmentMissing);
+                        };
+                        cs.enforce_constraint_arity_2(
+                            "XXX",
+                            || lc![new_fp.variable],
+                            || lc![fp.variable],
+                        )?;
+                        *state_item = new_state_item;
+                    } else {
+                        // If the state item is a constant, we can just raise it to alpha_inv.
+                        *state_item = state_item.pow_by_constant(&alpha_inv)?;
+                    }
                 }
             }
-        } else {
-            let alpha_inv = self.parameters.alpha_inv.to_u64_digits();
-            for state_item in state {
-                if let FpVar::Var(ref fp) = state_item {
-                    let new_state_item = FpVar::new_witness(cs.clone(), || {
-                        state_item.value().map(|e| e.pow(&alpha_inv))
-                    })?;
-                    let FpVar::Var(ref new_fp) = new_state_item else {
-                        return Err(SynthesisError::AssignmentMissing);
-                    };
-                    cs.enforce_constraint("XXX", || lc![new_fp.variable], lc![fp.variable])?;
-                    *state_item = new_state_item;
-                } else {
-                    // If the state item is a constant, we can just raise it to alpha_inv.
-                    *state_item = state_item.pow_by_constant(&alpha_inv)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "r1cs")]
-    #[tracing::instrument(target = "gr1cs", skip(self))]
-    fn apply_s_box(
-        &self,
-        state: &mut [FpVar<F>],
-        alpha: u64,
-        is_forward_pass: bool,
-    ) -> Result<(), SynthesisError> {
-        if is_forward_pass {
+        } else if is_forward_pass {
             for state_item in state.iter_mut() {
                 *state_item = state_item.pow_by_constant([self.parameters.alpha])?;
             }
@@ -110,6 +109,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                 *state_item = output;
             }
         }
+
         Ok(())
     }
 
