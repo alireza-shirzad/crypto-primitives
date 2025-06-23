@@ -10,6 +10,8 @@ use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 
+const RESCUE_PREDICATE: &str = "Deg5Mul";
+
 #[derive(Clone)]
 /// the gadget for Rescue sponge
 ///
@@ -43,7 +45,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         alpha: u64,
         is_forward_pass: bool,
     ) -> Result<(), SynthesisError> {
-        if self.cs.has_predicate("Deg5Mul") {
+        if self.cs.has_predicate(RESCUE_PREDICATE) {
             use ark_relations::lc;
 
             let cs = state
@@ -60,7 +62,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                             return Err(SynthesisError::AssignmentMissing);
                         };
                         cs.enforce_constraint_arity_2(
-                            "Deg5Mul",
+                            RESCUE_PREDICATE,
                             || lc![fp.variable],
                             || lc![new_fp.variable],
                         )?;
@@ -81,7 +83,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                             return Err(SynthesisError::AssignmentMissing);
                         };
                         cs.enforce_constraint_arity_2(
-                            "Deg5Mul",
+                            RESCUE_PREDICATE,
                             || lc![new_fp.variable],
                             || lc![fp.variable],
                         )?;
