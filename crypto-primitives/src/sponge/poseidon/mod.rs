@@ -67,12 +67,12 @@ impl<F: PrimeField> PoseidonSponge<F> {
         // Full rounds apply the S Box (x^alpha) to every element of state
         if is_full_round {
             for elem in state {
-                *elem = elem.pow(&[self.parameters.alpha]);
+                *elem = elem.pow([self.parameters.alpha]);
             }
         }
         // Partial rounds apply the S Box (x^alpha) to just the first element of state
         else {
-            state[0] = state[0].pow(&[self.parameters.alpha]);
+            state[0] = state[0].pow([self.parameters.alpha]);
         }
     }
 

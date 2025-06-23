@@ -106,10 +106,9 @@ impl<F: PrimeField + Absorb> AllocVar<PoseidonConfig<F>, F> for CRHParametersVar
         f: impl FnOnce() -> Result<T, SynthesisError>,
         _mode: AllocationMode,
     ) -> Result<Self, SynthesisError> {
-        f().and_then(|param| {
+        f().map(|param| {
             let parameters = param.borrow().clone();
-
-            Ok(Self { parameters })
+            Self { parameters }
         })
     }
 }

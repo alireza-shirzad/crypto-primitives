@@ -5,16 +5,12 @@ use crate::sponge::{
 use ark_ff::{BigInteger, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::any::TypeId;
-
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
-
+use num_bigint::BigUint;
 /// constraints for Rescue
 #[cfg(feature = "constraints")]
 pub mod constraints;
-
-// use digest::Output;
-use num_bigint::BigUint;
 
 /// Config and RNG used
 #[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
@@ -24,7 +20,7 @@ pub struct RescueConfig<F: PrimeField> {
     pub rounds: usize,
     /// Exponent used in S-boxes.
     pub alpha: u64,
-    /// Exponent used in S-boxes.
+    /// Exponent used in inverse S-boxes.
     pub alpha_inv: BigUint,
     /// Additive Round constants.
     /// They are indexed by `ark[round_num][state_element_index]`
@@ -32,12 +28,10 @@ pub struct RescueConfig<F: PrimeField> {
     pub arc: Vec<Vec<F>>,
     /// Maximally Distance Separating (MDS) Matrix.
     pub mds: Vec<Vec<F>>,
-    /// The rate (in terms of number of field elements).
+    /// The rate (in terms of number of field elements). specified by parameter `r_p` in the [paper](https://eprint.iacr.org/2020/1143.pdf)
     pub rate: usize,
-    /// The capacity (in terms of number of field elements).
+    /// The capacity (in terms of number of field elements). specified by parameter `c_p` in the [paper](https://eprint.iacr.org/2020/1143.pdf)
     pub capacity: usize,
-    // /// The number of field elements to output.
-    pub output_size: usize,
 }
 
 #[derive(Clone)]
@@ -55,17 +49,22 @@ pub struct RescueSponge<F: PrimeField> {
 
 impl<F: PrimeField> RescueSponge<F> {
     /// Apply the S-box to the state. the exponent can be `alpha` or `alpha_inv` depending on the position of the s-box in the permutation.
-    fn apply_s_box(&self, state: &mut [F], exponent: &[u64]) {
-        for elem in state {
-            *elem = elem.pow(exponent);
+    fn apply_s_box(&self, state: &mut [F], round: usize) {
+        if (round % 2) == 0 {
+            for elem in state {
+                *elem = elem.pow(self.parameters.alpha_inv.to_u64_digits());
+            }
+        } else {
+            for elem in state {
+                *elem = elem.pow([self.parameters.alpha]);
+            }
         }
     }
 
     /// Apply the additive round constants to the state. Depending on the round number i, the round key is fetched from `RescueConfig.arc[i]`
-    /// TODO: Change this to get the round number instead of the round key
-    fn apply_arc(&self, state: &mut [F], round_key: &Vec<F>) {
+    fn apply_arc(&self, state: &mut [F], round_number: usize) {
         for (i, state_elem) in state.iter_mut().enumerate() {
-            state_elem.add_assign(&round_key[i]);
+            state_elem.add_assign(&self.parameters.arc[round_number][i]);
         }
     }
 
@@ -87,16 +86,11 @@ impl<F: PrimeField> RescueSponge<F> {
     fn permute(&mut self) {
         let mut state = self.state.clone();
         assert_eq!(self.parameters.rounds * 2 + 1, self.parameters.arc.len());
-        // TODO: Check this arc[0]
-        self.apply_arc(&mut state, &self.parameters.arc[0]);
-        for (round, round_key) in self.parameters.arc[1..].iter().enumerate() {
-            if (round % 2) == 0 {
-                self.apply_s_box(&mut state, &self.parameters.alpha_inv.to_u64_digits());
-            } else {
-                self.apply_s_box(&mut state, &[self.parameters.alpha]);
-            }
+        self.apply_arc(&mut state, 0);
+        for (round, _round_key) in self.parameters.arc[1..].iter().enumerate() {
+            self.apply_s_box(&mut state, round);
             self.apply_mds(&mut state);
-            self.apply_arc(&mut state, round_key);
+            self.apply_arc(&mut state, round);
         }
 
         self.state = state;
@@ -176,7 +170,6 @@ impl<F: PrimeField> RescueConfig<F> {
         arc: Vec<Vec<F>>,
         rate: usize,
         capacity: usize,
-        output_size: usize,
     ) -> Self {
         assert_eq!(arc.len(), 2 * rounds + 1);
         for item in &arc {
@@ -194,41 +187,7 @@ impl<F: PrimeField> RescueConfig<F> {
             arc,
             rate,
             capacity,
-            output_size,
         }
-    }
-
-    // This is a temporary config to use for Garuda and Pari Benchamrks
-    // It has several issues inclusing: alpha is fixed to 5 now. It shouldn't be fixed.
-    // Also, the output length is not used at the moment and only one output is returned.
-    #[allow(clippy::too_many_arguments)]
-    pub fn test_conf() -> Self
-    where
-        num_bigint::BigUint: ark_std::convert::From<<F as ark_ff::PrimeField>::BigInt>,
-    {
-        let mut test_rng = ark_std::test_rng();
-
-        // The following way of generating the MDS matrix is incorrect
-        // and is only for test purposes.
-
-        let mut mds = vec![vec![]; 4];
-        for i in 0..4 {
-            for _ in 0..4 {
-                mds[i].push(F::rand(&mut test_rng));
-            }
-        }
-
-        let mut ark = vec![vec![]; 25];
-        for i in 0..25 {
-            for _ in 0..4 {
-                ark[i].push(F::rand(&mut test_rng));
-            }
-        }
-        let modulus = BigUint::from(F::MODULUS);
-        let modulus_sub_one = modulus - BigUint::from(1u8.into());
-        dbg!(&modulus_sub_one);
-        let alpha_inv = BigUint::from(5u8.into()).modinv(&modulus_sub_one).unwrap();
-        Self::new(12, 5, alpha_inv, mds, ark, 3, 1, 1)
     }
 }
 
@@ -240,7 +199,6 @@ impl<F: PrimeField> CryptographicSponge for RescueSponge<F> {
         let state = vec![F::zero(); parameters.rate + parameters.capacity];
 
         // The mode of the sponge is initially set to Absorbing the first element
-        // TODO: index of the field or byte?
         let mode = DuplexSpongeMode::Absorbing {
             next_absorb_index: 0,
         };
@@ -279,7 +237,7 @@ impl<F: PrimeField> CryptographicSponge for RescueSponge<F> {
     fn squeeze_bytes(&mut self, num_bytes: usize) -> Vec<u8> {
         let usable_bytes = ((F::MODULUS_BIT_SIZE - 1) / 8) as usize;
 
-        let num_elements = (num_bytes + usable_bytes - 1) / usable_bytes;
+        let num_elements = num_bytes.div_ceil(usable_bytes);
         let src_elements = self.squeeze_native_field_elements(num_elements);
 
         let mut bytes: Vec<u8> = Vec::with_capacity(usable_bytes * num_elements);
@@ -295,7 +253,7 @@ impl<F: PrimeField> CryptographicSponge for RescueSponge<F> {
     fn squeeze_bits(&mut self, num_bits: usize) -> Vec<bool> {
         let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
 
-        let num_elements = (num_bits + usable_bits - 1) / usable_bits;
+        let num_elements = num_bits.div_ceil(usable_bits);
         let src_elements = self.squeeze_native_field_elements(num_elements);
 
         let mut bits: Vec<bool> = Vec::with_capacity(usable_bits * num_elements);

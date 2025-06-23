@@ -9,11 +9,11 @@ use crate::{
 use ark_ff::PrimeField;
 use ark_std::vec::Vec;
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::Rng};
+
 #[cfg(feature = "constraints")]
 pub mod constraints;
 
 /// The Rescue collision-resistant hash function introduced in [SAD20][sad]
-///
 /// [sad]: https://eprint.iacr.org/2020/1143.pdf
 pub struct CRH<F: PrimeField + Absorb> {
     field_phantom: PhantomData<F>,
@@ -43,7 +43,7 @@ impl<F: PrimeField + Absorb> CRHScheme for CRH<F> {
 
         let mut sponge = RescueSponge::new(parameters);
         sponge.absorb(&input);
-        let res: Vec<F> = sponge.squeeze_field_elements::<F>(parameters.output_size);
+        let res: Vec<F> = sponge.squeeze_field_elements::<F>(1);
         Ok(res[0])
     }
 }
@@ -91,7 +91,7 @@ impl<F: PrimeField + Absorb> TwoToOneCRHScheme for TwoToOneCRH<F> {
         let mut sponge = RescueSponge::new(parameters);
         sponge.absorb(left_input);
         sponge.absorb(right_input);
-        let res = sponge.squeeze_field_elements::<F>(parameters.output_size);
+        let res = sponge.squeeze_field_elements::<F>(1);
         Ok(res[0])
     }
 }
