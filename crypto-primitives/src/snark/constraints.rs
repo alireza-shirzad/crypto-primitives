@@ -11,8 +11,7 @@ use ark_r1cs_std::{
 };
 use ark_relations::{
     gr1cs::{
-        ConstraintSynthesizer, ConstraintSystemRef, LinearCombination, Namespace, OptimizationGoal,
-        SynthesisError,
+        ConstraintSynthesizer, ConstraintSystemRef, LinearCombination, Namespace, SynthesisError,
     },
     lc, ns,
 };
@@ -461,11 +460,7 @@ where
         let ns = cs.into();
         let cs = ns.cs();
 
-        let optimization_type = match cs.optimization_goal() {
-            OptimizationGoal::None => OptimizationType::Constraints,
-            OptimizationGoal::Constraints => OptimizationType::Constraints,
-            OptimizationGoal::Weight => OptimizationType::Weight,
-        };
+        let optimization_type = OptimizationType::Constraints;
 
         let params = get_params(
             F::MODULUS_BIT_SIZE as usize,
@@ -578,11 +573,7 @@ where
                 val: field_allocation,
             })
         } else {
-            let optimization_type = match cs.optimization_goal() {
-                OptimizationGoal::None => OptimizationType::Constraints,
-                OptimizationGoal::Constraints => OptimizationType::Constraints,
-                OptimizationGoal::Weight => OptimizationType::Weight,
-            };
+            let optimization_type = OptimizationType::Constraints;
 
             let params = get_params(
                 F::MODULUS_BIT_SIZE as usize,
