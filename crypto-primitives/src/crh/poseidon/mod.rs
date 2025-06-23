@@ -11,7 +11,6 @@ use ark_std::{borrow::Borrow, marker::PhantomData, rand::Rng};
 
 #[cfg(feature = "constraints")]
 pub mod constraints;
-//TODO: CHange this r1cs to gr1cs in the future in a seperate PR
 pub struct CRH<F: PrimeField + Absorb> {
     field_phantom: PhantomData<F>,
 }

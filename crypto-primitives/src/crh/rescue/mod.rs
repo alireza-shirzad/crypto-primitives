@@ -29,9 +29,7 @@ impl<F: PrimeField + Absorb> CRHScheme for CRH<F> {
 
     /// Compute the parameters for the Rescue sponge.
     fn setup<R: Rng>(_rng: &mut R) -> Result<Self::Parameters, Error> {
-        // automatic generation of parameters are not implemented yet
-        // therefore, the developers must specify the parameters themselves
-        unimplemented!()
+        unimplemented!("Automatic generation of parameters is not implemented yet; developers must specify the parameters manually")
     }
 
     /// Evaluate the Rescue sponge on the input.
@@ -65,9 +63,7 @@ impl<F: PrimeField + Absorb> TwoToOneCRHScheme for TwoToOneCRH<F> {
 
     /// Compute the parameters for the Rescue sponge.
     fn setup<R: Rng>(_rng: &mut R) -> Result<Self::Parameters, Error> {
-        // automatic generation of parameters are not implemented yet
-        // therefore, the developers must specify the parameters themselves
-        unimplemented!()
+        unimplemented!("Automatic generation of parameters is not implemented yet; developers must specify the parameters manually")
     }
 
     /// Evaluate the Rescue sponge on the inputs left and right.

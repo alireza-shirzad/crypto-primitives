@@ -13,12 +13,7 @@ use ark_std::vec::Vec;
 pub const RESCUE_PREDICATE: &str = "Deg5-Mul";
 
 #[derive(Clone)]
-/// the gadget for Rescue sponge
-///
-/// This implementation of Rescue is entirely from Fractal's implementation in [COS20][cos]
-/// with small syntax changes.
-///
-/// [cos]: https://eprint.iacr.org/2019/1076
+/// Constraints for the Rescue sponge.
 pub struct RescueSpongeVar<F: PrimeField> {
     /// Constraint system
     pub cs: ConstraintSystemRef<F>,
@@ -26,7 +21,6 @@ pub struct RescueSpongeVar<F: PrimeField> {
     /// Sponge Parameters
     pub parameters: RescueConfig<F>,
 
-    // Sponge State
     /// The sponge's state
     pub state: Vec<FpVar<F>>,
     /// The mode
@@ -45,7 +39,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         alpha: u64,
         is_forward_pass: bool,
     ) -> Result<(), SynthesisError> {
-        if self.cs.has_predicate(RESCUE_PREDICATE) {
+        if alpha == 5 && self.cs.has_predicate(RESCUE_PREDICATE) {
             use ark_relations::lc;
 
             let cs = state
