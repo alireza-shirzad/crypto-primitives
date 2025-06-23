@@ -36,7 +36,6 @@ impl<F: PrimeField> SpongeWithGadget<F> for RescueSponge<F> {
 }
 
 impl<F: PrimeField> RescueSpongeVar<F> {
-    #[cfg(feature = "constraints")]
     #[tracing::instrument(target = "gr1cs", skip(self))]
     fn apply_s_box(
         &self,
@@ -44,7 +43,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
         alpha: u64,
         is_forward_pass: bool,
     ) -> Result<(), SynthesisError> {
-        if self.cs.has_predicate("XXX") {
+        if self.cs.has_predicate("Deg5Mul") {
             use ark_relations::lc;
 
             let cs = state
@@ -61,7 +60,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                             return Err(SynthesisError::AssignmentMissing);
                         };
                         cs.enforce_constraint_arity_2(
-                            "XXX",
+                            "Deg5Mul",
                             || lc![fp.variable],
                             || lc![new_fp.variable],
                         )?;
@@ -82,7 +81,7 @@ impl<F: PrimeField> RescueSpongeVar<F> {
                             return Err(SynthesisError::AssignmentMissing);
                         };
                         cs.enforce_constraint_arity_2(
-                            "XXX",
+                            "Deg5Mul",
                             || lc![new_fp.variable],
                             || lc![fp.variable],
                         )?;

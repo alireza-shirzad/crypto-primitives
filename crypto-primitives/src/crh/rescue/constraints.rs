@@ -154,7 +154,7 @@ mod test {
                 (Fr::from(-1i8), vec![(1, 1)]),
             ],
         );
-        cs.register_predicate("XXX", pow_pred).unwrap();
+        cs.register_predicate("Deg5Mul", pow_pred).unwrap();
         let mut test_a_g = Vec::new();
         let mut test_b_g = Vec::new();
 
