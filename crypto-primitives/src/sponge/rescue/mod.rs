@@ -90,7 +90,7 @@ impl<F: PrimeField> RescueSponge<F> {
         for (round, _round_key) in self.parameters.arc[1..].iter().enumerate() {
             self.apply_s_box(&mut state, round);
             self.apply_mds(&mut state);
-            self.apply_arc(&mut state, round+1);
+            self.apply_arc(&mut state, round + 1);
         }
 
         self.state = state;
