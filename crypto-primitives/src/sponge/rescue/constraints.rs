@@ -10,7 +10,7 @@ use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 #[cfg(not(feature = "std"))]
 use ark_std::vec::Vec;
 
-pub const RESCUE_PREDICATE: &str = "Deg5Mul";
+pub const RESCUE_PREDICATE: &str = "XXX";
 
 #[derive(Clone)]
 /// the gadget for Rescue sponge
