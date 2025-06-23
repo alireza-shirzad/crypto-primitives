@@ -41,9 +41,9 @@ debug-assertions = true
 debug = true
 
 [patch.crates-io]
-# ark-relations = { git = "https://github.com/arkworks-rs/snark" }
-# ark-snark = { git = "https://github.com/arkworks-rs/snark" }
-# ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std" }
+ark-relations = { git = "https://github.com/arkworks-rs/snark" }
+ark-snark = { git = "https://github.com/arkworks-rs/snark" }
+ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std" }
 # ark-relations = { path = "../snark/relations", default-features = true }
 # ark-r1cs-std = { path = "../r1cs-std", default-features = true }
 
